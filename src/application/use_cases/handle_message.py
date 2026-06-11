@@ -40,11 +40,11 @@ class HandleMessageUseCase:
         self._handlers = {
             ConversationStep.START: StartHandler(message_gateway),
             ConversationStep.INTENT: IntentHandler(message_gateway),
-            ConversationStep.PREFERENCES: PreferencesHandler(property_repo, message_gateway),
+            ConversationStep.PREFERENCES: PreferencesHandler(property_repo, message_gateway, extractor),
             ConversationStep.SHOWING: ShowingHandler(
                 property_repo, message_gateway, subscription_store
             ),
-            ConversationStep.DETAIL: DetailHandler(message_gateway),
+            ConversationStep.DETAIL: DetailHandler(message_gateway, property_repo),
         }
 
     def _is_within_business_hours(self) -> bool:

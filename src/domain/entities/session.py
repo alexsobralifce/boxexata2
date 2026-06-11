@@ -28,6 +28,7 @@ class Session:
         message_count: int = 0,
         selected_property_id: Optional[str] = None,
         history: Optional[list[str]] = None,
+        reference_point: Optional[str] = None,
     ) -> None:
         self.phone = phone
         self.step = step
@@ -41,6 +42,7 @@ class Session:
         self.message_count = message_count
         self.selected_property_id = selected_property_id
         self.history = history if history is not None else []
+        self.reference_point = reference_point
 
     def update_preferences(
         self,
@@ -49,6 +51,7 @@ class Session:
         neighborhood: Optional[str] = None,
         max_value: Optional[float] = None,
         client_name: Optional[str] = None,
+        reference_point: Optional[str] = None,
     ) -> None:
         """Atualiza os campos de preferências coletados do cliente."""
         if intent is not None:
@@ -61,6 +64,8 @@ class Session:
             self.max_value = max_value
         if client_name is not None:
             self.client_name = client_name
+        if reference_point is not None:
+            self.reference_point = reference_point
 
     def transition_to(self, step: ConversationStep) -> None:
         """Altera a etapa atual do fluxo da conversa."""
@@ -80,4 +85,5 @@ class Session:
         self.result_offset = 0
         self.selected_property_id = None
         self.history = []
+        self.reference_point = None
         self.step = ConversationStep.START

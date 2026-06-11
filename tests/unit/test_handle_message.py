@@ -108,23 +108,24 @@ async def test_full_dialog_flow(test_setup: Any) -> None:
     assert session.neighborhood == "Centro"
     assert session.max_value == 1500.0
     assert len(session.results) == 1
-    assert "REF101" in gateway.sent_texts[-1]["text"]
+    assert any("REF101" in msg["text"] for msg in gateway.sent_texts)
+    assert len(gateway.sent_images) == 1
 
     # Step 5: Selecionar o imóvel 1 (absoluto ou relativo)
     await use_case.execute(phone, "1", bypass_hours=True)
     session = await session_store.get_or_create(phone)
     assert session.step == ConversationStep.DETAIL
     assert session.selected_property_id == "101"
-    # Deve enviar fotos e detalhes
-    assert len(gateway.sent_images) == 1
-    assert gateway.sent_images[0]["image_url"] == "http://site/101_img1.jpg"
+    # Deve enviar fotos e detalhes (1 cover image from step 4 + 1 detailed view photo = 2 total)
+    assert len(gateway.sent_images) == 2
+    assert gateway.sent_images[-1]["image_url"] == "http://site/101_img1.jpg"
     assert "Rua A, 100" in gateway.sent_texts[-1]["text"]
 
     # Step 6: Voltar para a lista
     await use_case.execute(phone, "voltar", bypass_hours=True)
     session = await session_store.get_or_create(phone)
     assert session.step == ConversationStep.SHOWING
-    assert "REF101" in gateway.sent_texts[-1]["text"]
+    assert any("REF101" in msg["text"] for msg in gateway.sent_texts[-4:])
 
     # Step 7: Reiniciar busca
     await use_case.execute(phone, "reiniciar", bypass_hours=True)
@@ -170,7 +171,7 @@ async def test_preferences_handler_missing_type_and_neighborhood(test_setup: Any
     session.property_type = "Casa"
     await session_store.save(session)
     await use_case.execute(phone, "olá", bypass_hours=True)
-    assert "em qual bairro de sobral" in gateway.sent_texts[-1]["text"].lower()
+    assert "em qual bairro" in gateway.sent_texts[-1]["text"].lower()
 
 
 @pytest.mark.asyncio

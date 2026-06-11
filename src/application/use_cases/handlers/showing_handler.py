@@ -6,6 +6,7 @@ from src.domain.repositories.i_property_repository import IPropertyRepository
 from src.domain.repositories.i_subscription_store import ISubscriptionStore
 from src.shared.config import settings
 from src.shared.logger import logger
+from src.application.services.property_presenter import send_property_cards
 
 
 class ShowingHandler(BaseHandler):
@@ -112,29 +113,32 @@ class ShowingHandler(BaseHandler):
                 session.result_offset = next_offset
                 slice_results = session.results[next_offset : next_offset + page_size]
 
-                response_lines = ["Aqui estão mais algumas opções:\n"]
-                for idx, item in enumerate(slice_results):
-                    num = next_offset + idx + 1
-                    price = item.get("value", 0.0)
-                    price_fmt = (
-                        f"R$ {price:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-                    )
-                    response_lines.append(
-                        f"*{num}. {item.get('property_type')} no {item.get('neighborhood')}*\n"
-                        f"Valor: {price_fmt}\n"
-                        f"Ref: {item.get('ref')} | Endereço: {item.get('address')}\n"
-                        f"Link: {item.get('url')}\n"
-                    )
+                await self.message_gateway.send_text(
+                    session.phone,
+                    "Aqui estão mais algumas opções! 🏡✨👇"
+                )
+
+                await send_property_cards(
+                    phone=session.phone,
+                    slice_results=slice_results,
+                    start_num=next_offset + 1,
+                    property_repo=self.property_repo,
+                    message_gateway=self.message_gateway,
+                )
 
                 next_num_example = next_offset + 1
-                response_lines.append(
-                    f"Digite o número do imóvel para ver mais detalhes (ex: {next_num_example}), 'mais' para ver outros, 'alertar' para receber alertas deste perfil, ou 'reiniciar' para começar de novo."
+                footer_msg = (
+                    f"💡 *Dicas de navegação:*\n"
+                    f"- Digite o número do imóvel (ex: *{next_num_example}*) para ver opções de agendamento de visita ou mais fotos. 📸\n"
+                    f"- Digite *mais* para ver outras opções do seu perfil. 🔄\n"
+                    f"- Digite *alertar* para receber alertas deste perfil. 🔔\n"
+                    f"- Digite *reiniciar* para começar uma nova busca. 🔄"
                 )
-                await self.message_gateway.send_text(session.phone, "\n".join(response_lines))
+                await self.message_gateway.send_text(session.phone, footer_msg)
             else:
                 await self.message_gateway.send_text(
                     session.phone,
-                    "Não encontrei mais imóveis com essas preferências no site. Digite 'reiniciar' para fazer uma nova busca.",
+                    "Não encontrei mais imóveis com essas preferências no site. 😔 Digite 'reiniciar' para fazer uma nova busca. 🔄",
                 )
             return False
 

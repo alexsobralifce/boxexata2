@@ -1,14 +1,21 @@
 from src.application.use_cases.handlers.base_handler import BaseHandler
 from src.domain.entities.session import Session, ConversationStep
 from src.domain.repositories.i_message_gateway import IMessageGateway
+from src.domain.repositories.i_property_repository import IPropertyRepository
+from src.application.services.property_presenter import send_property_cards
 from src.shared.config import settings
 
 
 class DetailHandler(BaseHandler):
     """Handler para a etapa DETAIL (detalhes do imóvel e agendamento)."""
 
-    def __init__(self, message_gateway: IMessageGateway) -> None:
+    def __init__(
+        self,
+        message_gateway: IMessageGateway,
+        property_repo: IPropertyRepository,
+    ) -> None:
         self.message_gateway = message_gateway
+        self.property_repo = property_repo
 
     async def handle(self, session: Session, text: str) -> bool:
         clean_text = text.lower().strip()
@@ -31,23 +38,28 @@ class DetailHandler(BaseHandler):
             offset = session.result_offset
             slice_results = session.results[offset : offset + page_size]
 
-            response_lines = ["Encontrei esses imóveis que encaixam nas suas preferências:\n"]
-            for idx, item in enumerate(slice_results):
-                num = offset + idx + 1
-                price = item.get("value", 0.0)
-                price_fmt = f"R$ {price:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-                response_lines.append(
-                    f"*{num}. {item.get('property_type')} no {item.get('neighborhood')}*\n"
-                    f"Valor: {price_fmt}\n"
-                    f"Ref: {item.get('ref')} | Endereço: {item.get('address')}\n"
-                    f"Link: {item.get('url')}\n"
-                )
-
-            response_lines.append(
-                "Digite o número do imóvel para ver mais detalhes (ex: 1, 2, 3), 'mais' para ver outros, ou 'reiniciar' para começar de novo."
+            await self.message_gateway.send_text(
+                session.phone,
+                "Aqui estão as opções novamente! 🏡✨👇"
             )
 
-            await self.message_gateway.send_text(session.phone, "\n".join(response_lines))
+            await send_property_cards(
+                phone=session.phone,
+                slice_results=slice_results,
+                start_num=offset + 1,
+                property_repo=self.property_repo,
+                message_gateway=self.message_gateway,
+            )
+
+            next_num_example = offset + 1
+            footer_msg = (
+                f"💡 *Dicas de navegação:*\n"
+                f"- Digite o número do imóvel (ex: *{next_num_example}*) para ver opções de agendamento de visita ou mais fotos. 📸\n"
+                f"- Digite *mais* para ver outras opções do seu perfil. 🔄\n"
+                f"- Digite *alertar* para receber alertas deste perfil. 🔔\n"
+                f"- Digite *reiniciar* para começar uma nova busca. 🔄"
+            )
+            await self.message_gateway.send_text(session.phone, footer_msg)
             return False
 
         # Qualquer outra mensagem envia os dados de contato / agendamento

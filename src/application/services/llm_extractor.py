@@ -78,11 +78,13 @@ class LLMPreferenceExtractor(IPreferenceExtractor):
             '  "pet_friendly": boolean|null,\n'
             '  "garagem": boolean|null,\n'
             '  "mobiliado": boolean|null,\n'
-            '  "nome_cliente": string|null\n'
+            '  "nome_cliente": string|null,\n'
+            '  "ponto_referencia": string|null\n'
             "}\n\n"
             "Regras importantes:\n"
             "- Se o cliente disser seu próprio nome (ex: 'Me chamo Francisco', 'Oi, sou a Ana'), extraia para 'nome_cliente'.\n"
             "- Identifique bairros conhecidos de Sobral/CE (ex: Centro, Derby, Pedrinhas, Junco, Renato Parente, etc.). Se encontrar algum, coloque em 'bairro'.\n"
+            "- Se o cliente colocar um ponto de referência onde ele quer o imóvel ao invés de um bairro (ou em conjunto com o bairro) (ex: 'perto da UFC', 'próximo ao Shopping Sobral', 'perto da Santa Casa', 'próximo à catedral', etc.), identifique esse ponto de referência e coloque em 'ponto_referencia'. Remova preposições como 'perto de', 'próximo a', retendo apenas a entidade (ex: 'UFC', 'Shopping Sobral', 'Santa Casa').\n"
             "- Para 'tipo', padronize: se for kitnet/quitinete, retorne 'kitnet'. Se for casa, 'casa'. Se for apartamento/apto, 'apartamento'.\n"
             "- Se o cliente falar sobre aluguel, alugar, locar, retorne 'Locação' em 'finalidade'. Se falar sobre compra, comprar, venda, retorne 'Venda'.\n"
             "- 'valor_max' deve ser um número representando o limite de preço (ex: 'até R$ 1200' -> 1200.0, 'até 1.5 mil' -> 1500.0).\n"
@@ -134,6 +136,8 @@ class LLMPreferenceExtractor(IPreferenceExtractor):
                     extracted["property_type"] = data["tipo"].title()
             if data.get("bairro"):
                 extracted["neighborhood"] = data["bairro"].title()
+            if data.get("ponto_referencia"):
+                extracted["reference_point"] = data["ponto_referencia"]
             if data.get("valor_max") is not None:
                 try:
                     extracted["max_value"] = float(data["valor_max"])
@@ -148,3 +152,95 @@ class LLMPreferenceExtractor(IPreferenceExtractor):
                 error=str(e),
             )
             return await self.fallback.extract(text, history)
+
+    async def rank_properties_by_proximity(
+        self, reference_point: str, properties: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        """Rankea uma lista de imóveis pela proximidade a um ponto de referência usando o LLM."""
+        client = self._get_client()
+        if not client or not properties:
+            return properties
+
+        provider = settings.llm_provider
+        model = "gpt-4o-mini" if provider == "openai" else "deepseek-chat"
+
+        simplified_props = []
+        for p in properties:
+            simplified_props.append({
+                "id": p.get("id"),
+                "address": p.get("address"),
+                "neighborhood": p.get("neighborhood")
+            })
+
+        system_prompt = (
+            "Você é um especialista em geografia, arruamento e localização da cidade de Sobral, Ceará.\n"
+            "Sua tarefa é:\n"
+            f"1. Identificar o endereço/localização exata do ponto de referência '{reference_point}' em Sobral/CE.\n"
+            "2. Para cada imóvel da lista fornecida, determinar a distância aproximada ou facilidade de acesso até o ponto de referência (ex: 'Aprox. 400m', 'Aprox. 1.2km', 'Na mesma rua', etc.) com base no endereço e bairro do imóvel.\n"
+            "3. Ordenar os imóveis do mais próximo para o mais distante do ponto de referência.\n\n"
+            "Retorne APENAS um objeto JSON válido contendo exatamente a seguinte chave:\n"
+            "{\n"
+            '  "ranked_properties": [\n'
+            '    {\n'
+            '      "id": "ID_DO_IMOVEL",\n'
+            '      "proximity_description": "Breve descrição amigável da proximidade com emoji (ex: \'🚶 Aprox. 5 min a pé / 400m da UFC\', \'🚗 Aprox. 3 min de carro / 1.2km da UFC\')"\n'
+            '    },\n'
+            '    ...\n'
+            '  ]\n'
+            "}\n\n"
+            "Use apenas os IDs fornecidos. Não adicione novos imóveis. Se um imóvel estiver absurdamente longe ou for impossível de estimar, coloque uma descrição adequada mas ordene-o por último."
+        )
+
+        user_content = f"Lista de imóveis para rankear:\n{json.dumps(simplified_props, ensure_ascii=False)}"
+
+        try:
+            logger.info("Realizando chamada para LLM para rankeamento de proximidade", provider=provider, model=model, reference_point=reference_point)
+
+            async def _make_api_call() -> Any:
+                assert client is not None
+                return await client.chat.completions.create(
+                    model=model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_content},
+                    ],
+                    response_format={"type": "json_object"},
+                    temperature=0.0,
+                    timeout=12.0,
+                )
+
+            response = await self.circuit_breaker.call(_make_api_call)
+            content = response.choices[0].message.content
+            if not content:
+                raise ValueError("Resposta de rankeamento vazia do LLM")
+
+            data = json.loads(content)
+            ranked_list = data.get("ranked_properties", [])
+
+            ranked_map = {item["id"]: item["proximity_description"] for item in ranked_list if "id" in item and "proximity_description" in item}
+
+            ordered_properties = []
+            for item in ranked_list:
+                pid = item.get("id")
+                prop = next((p for p in properties if p.get("id") == pid), None)
+                if prop:
+                    prop_copy = dict(prop)
+                    prop_copy["proximity"] = item.get("proximity_description")
+                    ordered_properties.append(prop_copy)
+
+            # Garante que imóveis não retornados pelo LLM não sejam perdidos
+            for p in properties:
+                if p.get("id") not in [op.get("id") for op in ordered_properties]:
+                    prop_copy = dict(p)
+                    prop_copy["proximity"] = None
+                    ordered_properties.append(prop_copy)
+
+            logger.info("Rankeamento de proximidade concluído com sucesso", total=len(ordered_properties))
+            return ordered_properties
+
+        except Exception as e:
+            logger.error(
+                "Falha ao rankear imóveis por proximidade com LLM. Retornando lista original.",
+                error=str(e),
+            )
+            return [{**p, "proximity": None} for p in properties]

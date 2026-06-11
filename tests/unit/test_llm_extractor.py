@@ -87,3 +87,55 @@ async def test_llm_extractor_trips_circuit_breaker() -> None:
     res3 = await extractor.extract("msg3", [])
     assert res3 == {"fallback": True}
     mock_client.chat.completions.create.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_llm_extractor_reference_point() -> None:
+    mock_response = MagicMock()
+    mock_choices = MagicMock()
+    mock_choices.message.content = (
+        '{"nome_cliente": null, "finalidade": "Locação", "tipo": "casa", '
+        '"bairro": null, "valor_max": null, "ponto_referencia": "UFC"}'
+    )
+    mock_response.choices = [mock_choices]
+
+    mock_client = MagicMock()
+    mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+
+    extractor = LLMPreferenceExtractor(client=mock_client)
+    res = await extractor.extract(
+        "quero alugar uma casa perto da UFC", []
+    )
+
+    assert res.get("reference_point") == "UFC"
+    assert res.get("intent") == "Locação"
+    assert res.get("property_type") == "Casa"
+
+
+@pytest.mark.asyncio
+async def test_llm_proximity_ranking() -> None:
+    mock_response = MagicMock()
+    mock_choices = MagicMock()
+    mock_choices.message.content = (
+        '{"ranked_properties": ['
+        '  {"id": "103", "proximity_description": "🚶 Aprox. 3 min a pé da UFC"},'
+        '  {"id": "101", "proximity_description": "🚗 Aprox. 5 min de carro da UFC"}'
+        ']}'
+    )
+    mock_response.choices = [mock_choices]
+
+    mock_client = MagicMock()
+    mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+
+    extractor = LLMPreferenceExtractor(client=mock_client)
+    properties = [
+        {"id": "101", "ref": "REF101", "address": "Rua A", "neighborhood": "Centro"},
+        {"id": "103", "ref": "REF103", "address": "Rua C", "neighborhood": "Junco"}
+    ]
+    res = await extractor.rank_properties_by_proximity("UFC", properties)
+
+    assert len(res) == 2
+    assert res[0]["id"] == "103"
+    assert res[0]["proximity"] == "🚶 Aprox. 3 min a pé da UFC"
+    assert res[1]["id"] == "101"
+    assert res[1]["proximity"] == "🚗 Aprox. 5 min de carro da UFC"

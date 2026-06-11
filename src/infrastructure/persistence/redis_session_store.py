@@ -39,6 +39,7 @@ class RedisSessionStore(ISessionStore):
                     message_count=data.get("message_count", 0),
                     selected_property_id=data.get("selected_property_id"),
                     history=data.get("history"),
+                    reference_point=data.get("reference_point"),
                 )
         except Exception as e:
             logger.error("Erro ao buscar sessão no RedisSessionStore", phone=phone, error=str(e))
@@ -62,6 +63,7 @@ class RedisSessionStore(ISessionStore):
                 "message_count": session.message_count,
                 "selected_property_id": session.selected_property_id,
                 "history": session.history,
+                "reference_point": session.reference_point,
             }
             serialized = json.dumps(data)
             await self.client.set(key, serialized, ex=self.ttl)
