@@ -8,8 +8,8 @@ class Settings(BaseSettings):
     evolution_instance: str = "exatabot"
 
     # Z-API (gateway alternativo)
-    zapi_instance_id: str = ""   # ID da instância no painel Z-API
-    zapi_token: str = ""          # Token da instância no painel Z-API
+    zapi_instance_id: str = ""  # ID da instância no painel Z-API
+    zapi_token: str = ""  # Token da instância no painel Z-API
     zapi_client_token: str = ""  # Client-Token da conta Z-API (header de auth)
 
     # Provedor de WhatsApp ativo: "evolution" ou "zapi"
@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     # Redis (Fase 6)
     redis_url: str = "redis://localhost:6379/0"
     session_store_type: str = "memory"  # "memory" | "redis"
-    cache_type: str = "memory"          # "memory" | "redis"
+    cache_type: str = "memory"  # "memory" | "redis"
 
     # Alertas (Fase 7)
     subscription_store_type: str = "memory"  # "memory" | "redis"

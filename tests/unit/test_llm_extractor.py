@@ -19,7 +19,9 @@ async def test_llm_extractor_success() -> None:
     mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
 
     extractor = LLMPreferenceExtractor(client=mock_client)
-    res = await extractor.extract("oi, me chamo Francisco e quero alugar uma casa no Centro por 1200 reais", [])
+    res = await extractor.extract(
+        "oi, me chamo Francisco e quero alugar uma casa no Centro por 1200 reais", []
+    )
 
     assert res.get("client_name") == "Francisco"
     assert res.get("intent") == "Locação"

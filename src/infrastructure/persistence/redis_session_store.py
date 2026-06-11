@@ -66,4 +66,6 @@ class RedisSessionStore(ISessionStore):
             serialized = json.dumps(data)
             await self.client.set(key, serialized, ex=self.ttl)
         except Exception as e:
-            logger.error("Erro ao salvar sessão no RedisSessionStore", phone=session.phone, error=str(e))
+            logger.error(
+                "Erro ao salvar sessão no RedisSessionStore", phone=session.phone, error=str(e)
+            )

@@ -66,7 +66,9 @@ class ZApiGateway(IMessageGateway):
             ) as client:
                 response = await client.post(url, json=payload)
                 response.raise_for_status()
-                logger.info("Mensagem de texto enviada com sucesso via Z-API", phone=formatted_phone)
+                logger.info(
+                    "Mensagem de texto enviada com sucesso via Z-API", phone=formatted_phone
+                )
         except Exception as e:
             logger.error(
                 "Falha ao enviar mensagem de texto via Z-API",

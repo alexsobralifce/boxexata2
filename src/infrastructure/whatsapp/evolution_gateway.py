@@ -21,6 +21,7 @@ class EvolutionGateway(IMessageGateway):
     def instance(self) -> str:
         """Retorna o identificador da instância do WhatsApp dinamicamente do contexto ativo."""
         from src.shared.context import get_current_broker
+
         broker = get_current_broker()
         if broker:
             return broker.instance_id

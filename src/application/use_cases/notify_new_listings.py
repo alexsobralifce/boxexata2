@@ -48,7 +48,9 @@ class NotifyNewListingsUseCase:
 
                 new_listings = []
                 for listing in matched_listings:
-                    already_notified = await self.subscription_store.is_notified(sub.phone, listing.id)
+                    already_notified = await self.subscription_store.is_notified(
+                        sub.phone, listing.id
+                    )
                     if not already_notified:
                         new_listings.append(listing)
 

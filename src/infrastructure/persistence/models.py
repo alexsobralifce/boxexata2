@@ -19,6 +19,9 @@ class MessageLogs(SQLModel, table=True):
     @classmethod
     def from_entity(cls, entity: MessageLog) -> "MessageLogs":
         """Cria um modelo ORM a partir da entidade de domínio."""
+        created_at_naive = entity.created_at
+        if created_at_naive and created_at_naive.tzinfo:
+            created_at_naive = created_at_naive.replace(tzinfo=None)
         return cls(
             id=entity.id,
             phone=entity.phone,
@@ -26,7 +29,7 @@ class MessageLogs(SQLModel, table=True):
             text=entity.text,
             step=entity.step,
             intent=entity.intent,
-            created_at=entity.created_at,
+            created_at=created_at_naive,
         )
 
     def to_entity(self) -> MessageLog:
@@ -56,6 +59,9 @@ class BrokerProfiles(SQLModel, table=True):
     @classmethod
     def from_entity(cls, entity: BrokerProfile) -> "BrokerProfiles":
         """Cria um modelo ORM a partir da entidade de domínio."""
+        created_at_naive = entity.created_at
+        if created_at_naive and created_at_naive.tzinfo:
+            created_at_naive = created_at_naive.replace(tzinfo=None)
         return cls(
             instance_id=entity.instance_id,
             broker_name=entity.broker_name,
@@ -63,7 +69,7 @@ class BrokerProfiles(SQLModel, table=True):
             site_base_url=entity.site_base_url,
             bot_name=entity.bot_name,
             is_active=entity.is_active,
-            created_at=entity.created_at,
+            created_at=created_at_naive,
         )
 
     def to_entity(self) -> BrokerProfile:

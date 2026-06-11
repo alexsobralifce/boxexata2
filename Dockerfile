@@ -37,6 +37,7 @@ RUN groupadd -g 10001 appgroup && \
 
 # Copy application source code
 COPY --chown=appuser:appgroup src/ ./src/
+COPY --chown=appuser:appgroup tests/ ./tests/
 COPY --chown=appuser:appgroup main.py ./
 
 # Use the non-root user

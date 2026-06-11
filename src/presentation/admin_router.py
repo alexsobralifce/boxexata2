@@ -21,7 +21,9 @@ class Token(BaseModel):
 
 
 class BrokerProfileCreate(BaseModel):
-    instance_id: str = Field(..., min_length=2, description="ID único da instância do WhatsApp na Evolution API")
+    instance_id: str = Field(
+        ..., min_length=2, description="ID único da instância do WhatsApp na Evolution API"
+    )
     broker_name: str = Field(..., min_length=2, description="Nome do corretor ou imobiliária")
     phone_number: str = Field(..., description="Número de telefone do corretor")
     site_base_url: str = Field(..., description="URL base do site do corretor para scraping")
@@ -76,11 +78,13 @@ async def list_logs(
         # para visualização geral nós podemos consultar todas as linhas se for SqlMessageLogRepository.
         # Vamos verificar se o log_repo é do tipo SqlMessageLogRepository e tem acesso ao engine.
         from src.infrastructure.persistence.sql_log_repository import SqlMessageLogRepository
+
         if isinstance(log_repo, SqlMessageLogRepository):
             from sqlalchemy.ext.asyncio import AsyncSession
             from sqlmodel import select
             from sqlalchemy import desc
             from src.infrastructure.persistence.models import MessageLogs
+
             async with AsyncSession(log_repo._engine) as session:
                 statement = select(MessageLogs).order_by(desc(MessageLogs.created_at)).limit(limit)  # type: ignore[arg-type]
                 result = await session.execute(statement)

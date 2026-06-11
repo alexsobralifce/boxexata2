@@ -10,20 +10,11 @@ from src.shared.logger import logger
 def _serialize_cache_value(value: Any) -> str:
     """Serializa dados complexos para armazenamento no Redis de forma segura (JSON)."""
     if isinstance(value, PropertyListing):
-        return json.dumps({
-            "__type__": "PropertyListing",
-            "__data__": value.to_dict()
-        })
+        return json.dumps({"__type__": "PropertyListing", "__data__": value.to_dict()})
     elif isinstance(value, set):
-        return json.dumps({
-            "__type__": "set",
-            "__data__": list(value)
-        })
+        return json.dumps({"__type__": "set", "__data__": list(value)})
     else:
-        return json.dumps({
-            "__type__": "raw",
-            "__data__": value
-        })
+        return json.dumps({"__type__": "raw", "__data__": value})
 
 
 def _deserialize_cache_value(serialized: str) -> Any:
@@ -46,7 +37,7 @@ def _deserialize_cache_value(serialized: str) -> Any:
             url=val["url"],
             fees=Money(val["fees"]) if val.get("fees") else None,
             features=val.get("features", []),
-            photos=val.get("photos", [])
+            photos=val.get("photos", []),
         )
     elif t == "set":
         return set(val)
@@ -68,7 +59,9 @@ class RedisCache:
             serialized = await self.client.get(key)
             if serialized is None:
                 return None
-            return _deserialize_cache_value(serialized.decode("utf-8") if isinstance(serialized, bytes) else serialized)
+            return _deserialize_cache_value(
+                serialized.decode("utf-8") if isinstance(serialized, bytes) else serialized
+            )
         except Exception as e:
             logger.error("Erro ao obter chave do RedisCache", key=key, error=str(e))
             return None

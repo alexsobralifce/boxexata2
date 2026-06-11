@@ -41,16 +41,15 @@ class HandleMessageUseCase:
             ConversationStep.START: StartHandler(message_gateway),
             ConversationStep.INTENT: IntentHandler(message_gateway),
             ConversationStep.PREFERENCES: PreferencesHandler(property_repo, message_gateway),
-            ConversationStep.SHOWING: ShowingHandler(property_repo, message_gateway, subscription_store),
+            ConversationStep.SHOWING: ShowingHandler(
+                property_repo, message_gateway, subscription_store
+            ),
             ConversationStep.DETAIL: DetailHandler(message_gateway),
         }
 
     def _is_within_business_hours(self) -> bool:
-        now = datetime.now()
-        # Segunda (0) a Sexta (4)
-        if now.weekday() in range(0, 5):
-            return settings.business_hours_start <= now.hour < settings.business_hours_end
-        return False
+        # Bot responde 24/7 (qualquer hora)
+        return True
 
     async def execute(self, phone: str, text: str, bypass_hours: bool = False) -> None:
         """Processa uma mensagem recebida de um remetente, gerenciando a máquina de estados e enviando respostas."""

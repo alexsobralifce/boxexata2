@@ -20,7 +20,9 @@ class LLMPreferenceExtractor(IPreferenceExtractor):
     ) -> None:
         self.fallback = fallback_extractor or RegexPreferenceExtractor()
         self._client = client
-        self.circuit_breaker = circuit_breaker or CircuitBreaker(failure_threshold=3, recovery_timeout=60.0)
+        self.circuit_breaker = circuit_breaker or CircuitBreaker(
+            failure_threshold=3, recovery_timeout=60.0
+        )
 
     def _get_client(self) -> Optional[AsyncOpenAI]:
         if self._client is not None:

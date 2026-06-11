@@ -12,6 +12,7 @@ class StartHandler(BaseHandler):
     def _get_broker_info(self) -> tuple[str, str]:
         from src.shared.context import get_current_broker
         from src.shared.config import settings
+
         broker = get_current_broker()
         if broker:
             return broker.bot_name, broker.broker_name

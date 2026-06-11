@@ -6,6 +6,7 @@ from typing import Callable, Any
 
 class CircuitBreakerOpenException(Exception):
     """Exceção lançada quando o Circuit Breaker está aberto e rejeita chamadas."""
+
     pass
 
 

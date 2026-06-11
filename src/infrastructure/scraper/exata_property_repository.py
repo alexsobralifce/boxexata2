@@ -53,6 +53,7 @@ class ExataPropertyRepository(IPropertyRepository):
     def site_base_url(self) -> str:
         """Retorna a URL base do site de scraping de forma dinâmica do contexto ativo."""
         from src.shared.context import get_current_broker
+
         broker = get_current_broker()
         if broker and broker.site_base_url:
             return broker.site_base_url

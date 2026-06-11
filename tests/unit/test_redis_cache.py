@@ -28,7 +28,9 @@ async def test_redis_cache_set_and_get_raw() -> None:
     await cache.set("simple_key", {"a": 1, "b": "hello"})
     res = await cache.get("simple_key")
     assert res == {"a": 1, "b": "hello"}
-    mock_redis.set.assert_called_with("simple_key", '{"__type__": "raw", "__data__": {"a": 1, "b": "hello"}}', ex=600)
+    mock_redis.set.assert_called_with(
+        "simple_key", '{"__type__": "raw", "__data__": {"a": 1, "b": "hello"}}', ex=600
+    )
 
 
 @pytest.mark.asyncio

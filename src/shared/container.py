@@ -19,9 +19,10 @@ from src.infrastructure.persistence.null_log_repository import NullMessageLogRep
 from src.application.services.message_log_middleware import MessageLogMiddleware
 from src.domain.repositories.i_broker_profile_repository import IBrokerProfileRepository
 from src.infrastructure.persistence.sql_broker_profile_repository import SqlBrokerProfileRepository
-from src.infrastructure.persistence.memory_broker_profile_repository import MemoryBrokerProfileRepository
+from src.infrastructure.persistence.memory_broker_profile_repository import (
+    MemoryBrokerProfileRepository,
+)
 from sqlalchemy.ext.asyncio import AsyncEngine
-
 
 
 def create_container(settings: Settings) -> dict[str, Any]:
@@ -33,12 +34,14 @@ def create_container(settings: Settings) -> dict[str, Any]:
         or settings.subscription_store_type == "redis"
     ):
         from redis.asyncio import Redis
+
         redis_client = Redis.from_url(settings.redis_url)
 
     # Inicializa Cache
     cache: Any
     if settings.cache_type == "redis":
         from src.infrastructure.cache.redis_cache import RedisCache
+
         assert redis_client is not None
         cache = RedisCache(redis_client, default_ttl_seconds=settings.cache_ttl_minutes * 60)
     else:
@@ -62,6 +65,7 @@ def create_container(settings: Settings) -> dict[str, Any]:
     session_store: Any
     if settings.session_store_type == "redis":
         from src.infrastructure.persistence.redis_session_store import RedisSessionStore
+
         assert redis_client is not None
         session_store = RedisSessionStore(redis_client, ttl_seconds=86400)
     else:
@@ -71,10 +75,12 @@ def create_container(settings: Settings) -> dict[str, Any]:
     subscription_store: Any
     if settings.subscription_store_type == "redis":
         from src.infrastructure.persistence.redis_subscription_store import RedisSubscriptionStore
+
         assert redis_client is not None
         subscription_store = RedisSubscriptionStore(redis_client, ttl_notified_seconds=604800)
     else:
         from src.infrastructure.persistence.memory_subscription_store import MemorySubscriptionStore
+
         subscription_store = MemorySubscriptionStore()
 
     extractor: IPreferenceExtractor
@@ -89,6 +95,7 @@ def create_container(settings: Settings) -> dict[str, Any]:
 
     if settings.message_log_enabled and settings.database_url:
         from sqlalchemy.ext.asyncio import create_async_engine
+
         db_engine = create_async_engine(settings.database_url)
         log_repo = SqlMessageLogRepository(db_engine)
         # Decorador do gateway para registrar logs de saída automaticamente
@@ -117,6 +124,7 @@ def create_container(settings: Settings) -> dict[str, Any]:
     )
 
     from src.application.use_cases.notify_new_listings import NotifyNewListingsUseCase
+
     notify_use_case = NotifyNewListingsUseCase(
         property_repo=property_repo,
         message_gateway=message_gateway,
@@ -147,5 +155,6 @@ def get_container() -> dict[str, Any]:
     global _container
     if _container is None:
         from src.shared.config import settings
+
         _container = create_container(settings)
     return _container

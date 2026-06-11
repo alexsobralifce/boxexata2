@@ -52,6 +52,7 @@ class ShowingHandler(BaseHandler):
                 return False
 
             from src.domain.entities.subscription import Subscription
+
             subscription = Subscription(
                 phone=session.phone,
                 intent=session.intent,

@@ -59,6 +59,7 @@ def test_setup() -> tuple[
     property_repo.add_property(p3)
 
     from src.infrastructure.persistence.memory_subscription_store import MemorySubscriptionStore
+
     subscription_store = MemorySubscriptionStore()
 
     use_case = HandleMessageUseCase(
@@ -299,7 +300,7 @@ async def test_showing_handler_alertar(test_setup: Any) -> None:
 
     # Verifica se enviou mensagem de sucesso
     assert "assinatura de alertas ativada" in gateway.sent_texts[-1]["text"].lower()
-    
+
     # Verifica se salvou a assinatura no store
     sub = await use_case._subscription_store.get(phone)
     assert sub is not None
@@ -320,6 +321,7 @@ async def test_showing_handler_desativar_alerta(test_setup: Any) -> None:
 
     # Cria uma assinatura ativa direto no store
     from src.domain.entities.subscription import Subscription
+
     sub = Subscription(
         phone=phone,
         intent="Locação",

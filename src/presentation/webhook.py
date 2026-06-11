@@ -18,18 +18,20 @@ from src.shared.container import get_container
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Startup:
     container = get_container()
-    
+
     # Inicializa banco de dados se ativado (Fase 8A)
     db_engine = container.get("db_engine")
     if db_engine:
         from sqlmodel import SQLModel
+
         async with db_engine.begin() as conn:
             await conn.run_sync(SQLModel.metadata.create_all)
         logger.info("Tabelas do banco de dados inicializadas com sucesso")
 
     from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
     scheduler = AsyncIOScheduler()
-    
+
     notify_use_case = container["notify_new_listings"]
     scheduler.add_job(
         notify_use_case.execute,
@@ -43,9 +45,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         "Scheduler iniciado com sucesso",
         interval_minutes=settings.notify_check_interval_minutes,
     )
-    
+
     yield
-    
+
     # Shutdown:
     scheduler.shutdown()
     logger.info("Scheduler finalizado com sucesso")
@@ -110,7 +112,9 @@ async def test_scraping(
 async def test_mensagem(
     numero: str = Query(..., description="Número do telefone do remetente"),
     mensagem: str = Query(..., description="Texto da mensagem enviada pelo remetente"),
-    instancia: Optional[str] = Query(None, description="Nome da instância do corretor para multi-tenant"),
+    instancia: Optional[str] = Query(
+        None, description="Nome da instância do corretor para multi-tenant"
+    ),
 ) -> dict[str, Any]:
     """Simula o envio de uma mensagem pelo usuário e captura as mensagens de resposta do bot."""
     container = get_container()
@@ -133,6 +137,7 @@ async def test_mensagem(
         profile = await container["broker_repo"].get_by_instance(instancia)
 
     from src.shared.context import set_current_broker, current_broker
+
     token = set_current_broker(profile)
 
     try:
@@ -154,13 +159,14 @@ async def test_mensagem(
         current_broker.reset(token)
 
 
-async def _process_webhook_message(instance_id: str, phone: str, text: str):
+async def _process_webhook_message(instance_id: str, phone: str, text: str) -> None:
     """Executa o processamento da mensagem com o contexto do broker correto."""
     cont = get_container()
     broker_repo = cont["broker_repo"]
     broker_profile = await broker_repo.get_by_instance(instance_id)
 
     from src.shared.context import set_current_broker, current_broker
+
     tok = set_current_broker(broker_profile)
     try:
         uc = cont["handle_message"]
@@ -178,7 +184,9 @@ async def webhook(request: Request) -> dict[str, str]:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     payload = await request.json()
-    if payload.get("event") != "messages.upsert" or payload.get("data", {}).get("key", {}).get("fromMe"):
+    if payload.get("event") != "messages.upsert" or payload.get("data", {}).get("key", {}).get(
+        "fromMe"
+    ):
         return {"status": "ignored"}
 
     data = payload["data"]
@@ -189,10 +197,12 @@ async def webhook(request: Request) -> dict[str, str]:
     phone = remote_jid.split("@")[0]
     message = data.get("message", {})
     text = message.get("conversation") or message.get("extendedTextMessage", {}).get("text", "")
-    
+
     if text:
-        asyncio.create_task(_process_webhook_message(payload.get("instance", ""), phone, text.strip()))
-    
+        asyncio.create_task(
+            _process_webhook_message(payload.get("instance", ""), phone, text.strip())
+        )
+
     return {"status": "processing"}
 
 
@@ -200,13 +210,16 @@ async def webhook(request: Request) -> dict[str, str]:
 async def webhook_zapi(request: Request) -> dict[str, str]:
     """Recebe eventos da Z-API."""
     payload = await request.json()
-    
-    # Z-API structure: sender, message { textContent }, instanceId
-    phone = payload.get("sender", "").replace("@c.us", "")
-    text = payload.get("message", {}).get("textContent", {}).get("text", "")
+    logger.info("Recebido webhook da Z-API", payload=payload)
+
+    # Corrigido: Z-API structure para callbacks de recebimento reais
+    phone = payload.get("phone", "")
+    text_obj = payload.get("text", {})
+    text = text_obj.get("message", "") if isinstance(text_obj, dict) else ""
     instance_id = payload.get("instanceId", "")
 
     if not phone or not text:
+        logger.info("Ignorando webhook Z-API: telefone ou texto ausente", phone=phone, text=text)
         return {"status": "ignored"}
 
     asyncio.create_task(_process_webhook_message(instance_id, phone, text.strip()))
