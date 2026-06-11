@@ -1,12 +1,12 @@
-# Byte-compiled / optimized / DLL support
+# ==============================================================================
+# ExataBot — Professional .gitignore
+# ==============================================================================
+
+# --- Python ---
 __pycache__/
 *.py[cod]
 *$py.class
-
-# C extensions
 *.so
-
-# Distribution / packaging
 .Python
 build/
 develop-eggs/
@@ -24,30 +24,99 @@ share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+MANIFEST
 
-# Virtual environments
-venv/
+# --- Virtual Environments ---
 .venv/
+venv/
 env/
 ENV/
+env.bak/
+venv.bak/
+pip-selfcheck.json
 
-# IDEs
+# --- Testing & Coverage ---
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.hypothesis/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pytype/
+htmlcov/
+
+# --- Jupyter Notebooks ---
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+
+# --- Editors & IDEs ---
+# VS Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+.history/
+
+# PyCharm / IntelliJ
 .idea/
-.vscode/
+*.iws
+*.iml
+*.ipr
+
+# Other editors
 *.swp
 *.swo
+*~
+\#*\#
+.#*
+
+# --- Operating System ---
+# macOS
 .DS_Store
+.AppleDouble
+.LSOverride
+Icon\r
+._*
+.DocumentRevisions-V100
+.SyncID
+.SyncOld
+.Spotlight-V100
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
 
-# Environment variables
-.env
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.lnk
+*.cab
+*.msi
+*.msm
+*.msp
+*.lnk
 
-# Testing / coverage
-.pytest_cache/
-.coverage
-htmlcov/
-.mypy_cache/
-
-# Local database / data
+# --- Local Databases & Data Volumes ---
 evolution_data/
 *.db
 *.sqlite
+*.sqlite3
+*.log
+local_data/
+
+# --- Environment & Configuration Secrets ---
+.env
+.env.local
+.env.*.local
+*.env
+!.env.example
