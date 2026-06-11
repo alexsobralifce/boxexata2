@@ -1,9 +1,14 @@
 from datetime import datetime
+import asyncio
+from typing import Optional
 from src.domain.entities.session import ConversationStep
 from src.domain.repositories.i_session_store import ISessionStore
 from src.domain.repositories.i_property_repository import IPropertyRepository
 from src.domain.repositories.i_message_gateway import IMessageGateway
 from src.application.services.i_preference_extractor import IPreferenceExtractor
+from src.domain.repositories.i_subscription_store import ISubscriptionStore
+from src.domain.repositories.i_message_log_repository import IMessageLogRepository
+from src.domain.entities.message_log import MessageLog
 from src.application.use_cases.handlers.start_handler import StartHandler
 from src.application.use_cases.handlers.intent_handler import IntentHandler
 from src.application.use_cases.handlers.preferences_handler import PreferencesHandler
@@ -22,17 +27,21 @@ class HandleMessageUseCase:
         property_repo: IPropertyRepository,
         message_gateway: IMessageGateway,
         extractor: IPreferenceExtractor,
+        subscription_store: ISubscriptionStore,
+        log_repo: Optional[IMessageLogRepository] = None,
     ) -> None:
         self._session_store = session_store
         self._property_repo = property_repo
         self._message_gateway = message_gateway
         self._extractor = extractor
+        self._subscription_store = subscription_store
+        self._log_repo = log_repo
 
         self._handlers = {
             ConversationStep.START: StartHandler(message_gateway),
             ConversationStep.INTENT: IntentHandler(message_gateway),
             ConversationStep.PREFERENCES: PreferencesHandler(property_repo, message_gateway),
-            ConversationStep.SHOWING: ShowingHandler(property_repo, message_gateway),
+            ConversationStep.SHOWING: ShowingHandler(property_repo, message_gateway, subscription_store),
             ConversationStep.DETAIL: DetailHandler(message_gateway),
         }
 
@@ -53,7 +62,7 @@ class HandleMessageUseCase:
             await self._message_gateway.send_text(
                 phone,
                 "Olá! No momento estamos fora do nosso horário de atendimento (Segunda a Sexta, das 08h às 18h). "
-                "Deixe sua mensagem e responderemos assim que retornarmos!"
+                "Deixe sua mensagem e responderemos assim que retornarmos!",
             )
             return
 
@@ -65,9 +74,23 @@ class HandleMessageUseCase:
         session.history.append(f"Cliente: {text}")
         session.history = session.history[-20:]
 
+        # 2b. Loga a mensagem de entrada (se o repositório estiver ativo)
+        if self._log_repo:
+            step_str = session.step.name if hasattr(session.step, "name") else str(session.step)
+            incoming_log = MessageLog(
+                phone=phone,
+                direction="in",
+                text=text,
+                step=step_str,
+                intent=session.intent,
+            )
+            asyncio.create_task(self._log_repo.save(incoming_log))
+
         # 3. Executa a extração de preferências caso a conversa não esteja nas etapas de paginação/detalhe
         if session.step not in (ConversationStep.SHOWING, ConversationStep.DETAIL):
-            extracted = await self._extractor.extract(text, [line for line in session.history if "Cliente:" in line])
+            extracted = await self._extractor.extract(
+                text, [line for line in session.history if "Cliente:" in line]
+            )
             session.update_preferences(**extracted)
 
         # 4. Loop da máquina de estados

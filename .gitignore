@@ -120,3 +120,4 @@ local_data/
 .env.*.local
 *.env
 !.env.example
+.env.local

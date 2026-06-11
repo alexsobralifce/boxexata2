@@ -30,7 +30,7 @@ SOBRAL_NEIGHBORHOODS = [
 class RegexPreferenceExtractor(IPreferenceExtractor):
     """Extração de preferências a partir de expressões regulares."""
 
-    async def extract(self, text: str, history: list[str]) -> dict:
+    async def extract(self, text: str, history: list[str]) -> dict[str, Any]:
         """Extrai as preferências contidas no texto."""
         nome = self.extrair_nome(text)
         valor_max = self.extrair_valor_max(text)
@@ -124,7 +124,12 @@ class RegexPreferenceExtractor(IPreferenceExtractor):
     def extrair_intent(self, text: str) -> Optional[str]:
         """Identifica a finalidade (Locação ou Venda)."""
         text_lower = text.lower()
-        if "alugar" in text_lower or "aluguel" in text_lower or "locação" in text_lower or "locacao" in text_lower:
+        if (
+            "alugar" in text_lower
+            or "aluguel" in text_lower
+            or "locação" in text_lower
+            or "locacao" in text_lower
+        ):
             return "Locação"
         if "comprar" in text_lower or "venda" in text_lower or "vender" in text_lower:
             return "Venda"

@@ -1,0 +1,14 @@
+services:
+  exatabot:
+    # Sobrescreve o comando padrão para rodar com hot-reload ativo
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    # Mapeia os arquivos de desenvolvimento local para dentro do container
+    volumes:
+      - ./src:/app/src
+      - ./main.py:/app/main.py
+      # Mapeia o arquivo .env se estiver presente para permitir alterações locais sem reconstruir o container
+      - .env:/app/.env
+    # Redefine a variável para apontar localmente se necessário, mas mantém a rede interna
+    environment:
+      - EVOLUTION_API_URL=http://evolution-api:8080
+      - LLM_PROVIDER=regex

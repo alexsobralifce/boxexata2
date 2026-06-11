@@ -9,7 +9,7 @@ class MemoryCache:
         self.default_ttl = default_ttl_seconds
         self._cache: dict[str, tuple[Any, float]] = {}
 
-    def get(self, key: str) -> Optional[Any]:
+    async def get(self, key: str) -> Optional[Any]:
         """Recupera um valor do cache se não estiver expirado."""
         if key not in self._cache:
             return None
@@ -19,17 +19,17 @@ class MemoryCache:
             return None
         return value
 
-    def set(self, key: str, value: Any, ttl_seconds: Optional[int] = None) -> None:
+    async def set(self, key: str, value: Any, ttl_seconds: Optional[int] = None) -> None:
         """Armazena um valor no cache com um TTL opcional."""
         ttl = ttl_seconds if ttl_seconds is not None else self.default_ttl
         expiry = time.time() + ttl
         self._cache[key] = (value, expiry)
 
-    def delete(self, key: str) -> None:
+    async def delete(self, key: str) -> None:
         """Remove um item do cache."""
         if key in self._cache:
             del self._cache[key]
 
-    def clear(self) -> None:
+    async def clear(self) -> None:
         """Limpa todo o cache."""
         self._cache.clear()

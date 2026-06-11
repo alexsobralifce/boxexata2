@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ExataBot — Dashboard Administrativo</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <!-- CSS Estilos -->
+    <link rel="stylesheet" href="/admin/styles.css">
+</head>
+<body>
+    <div class="glow-container">
+        <div class="glow-circle glow-1"></div>
+        <div class="glow-circle glow-2"></div>
+    </div>
+
+    <!-- Login Card -->
+    <div id="login-container" class="glass-card login-card active">
+        <div class="card-header">
+            <h2>ExataBot</h2>
+            <p>Faça login para acessar o painel de controle</p>
+        </div>
+        <form id="login-form">
+            <div class="form-group">
+                <label for="username">Usuário</label>
+                <input type="text" id="username" required placeholder="Digite o usuário de admin">
+            </div>
+            <div class="form-group">
+                <label for="password">Senha</label>
+                <input type="password" id="password" required placeholder="Digite a senha">
+            </div>
+            <button type="submit" class="btn btn-primary">Entrar no Painel</button>
+            <p id="login-error" class="error-text"></p>
+        </form>
+    </div>
+
+    <!-- Dashboard App -->
+    <div id="app-container" class="app-layout">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar glass-card">
+            <div class="sidebar-brand">
+                <h1>ExataBot</h1>
+                <span>Painel Admin</span>
+            </div>
+            <nav class="sidebar-nav">
+                <button class="nav-link active" data-tab="logs">
+                    <span class="nav-icon">💬</span> Conversas &amp; Logs
+                </button>
+                <button class="nav-link" data-tab="brokers">
+                    <span class="nav-icon">💼</span> Gestão de Corretores
+                </button>
+                <button class="nav-link" data-tab="subscriptions">
+                    <span class="nav-icon">🔔</span> Alertas Ativos
+                </button>
+            </nav>
+            <div class="sidebar-footer">
+                <button id="logout-btn" class="btn btn-secondary btn-sm">Sair</button>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="main-header glass-card">
+                <div class="header-info">
+                    <h2 id="tab-title">Conversas &amp; Logs</h2>
+                    <p id="tab-subtitle">Monitore as conversas enviadas e recebidas do WhatsApp em tempo real</p>
+                </div>
+                <div class="header-user">
+                    <span>Administrador</span>
+                </div>
+            </header>
+
+            <!-- Tab Content: Logs -->
+            <section id="tab-content-logs" class="tab-content active">
+                <div class="glass-card filter-bar">
+                    <div class="filter-group">
+                        <label for="filter-phone">Buscar por Telefone</label>
+                        <input type="text" id="filter-phone" placeholder="Ex: 5511999999999">
+                    </div>
+                    <div class="filter-group">
+                        <label for="filter-limit">Limite</label>
+                        <select id="filter-limit">
+                            <option value="50">50 registros</option>
+                            <option value="100" selected>100 registros</option>
+                            <option value="200">200 registros</option>
+                        </select>
+                    </div>
+                    <button id="btn-refresh-logs" class="btn btn-primary btn-auto">Filtrar / Recarregar</button>
+                </div>
+
+                <div class="glass-card table-card">
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Data / Hora</th>
+                                    <th>Telefone</th>
+                                    <th>Direção</th>
+                                    <th>Etapa (Step)</th>
+                                    <th>Intenção</th>
+                                    <th>Mensagem</th>
+                                </tr>
+                            </thead>
+                            <tbody id="logs-table-body">
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted">Carregando logs de auditoria...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tab Content: Brokers -->
+            <section id="tab-content-brokers" class="tab-content">
+                <div class="grid-layout">
+                    <!-- Lista de Corretores -->
+                    <div class="glass-card col-left">
+                        <div class="card-header-actions">
+                            <h3>Corretores Registrados</h3>
+                            <button id="btn-refresh-brokers" class="btn btn-secondary btn-sm">Atualizar</button>
+                        </div>
+                        <div class="brokers-list" id="brokers-list-container">
+                            <p class="text-center text-muted">Carregando perfis de corretores...</p>
+                        </div>
+                    </div>
+
+                    <!-- Formulário CRUD -->
+                    <div class="glass-card col-right">
+                        <h3 id="form-broker-title">Novo Corretor / Imobiliária</h3>
+                        <form id="broker-form" class="crud-form">
+                            <div class="form-group">
+                                <label for="broker-instance-id">ID da Instância (Evolution API)</label>
+                                <input type="text" id="broker-instance-id" required placeholder="Ex: corretor_antonio">
+                            </div>
+                            <div class="form-group">
+                                <label for="broker-name">Nome do Corretor / Imobiliária</label>
+                                <input type="text" id="broker-name" required placeholder="Ex: Antônio Silva Corretor">
+                            </div>
+                            <div class="form-group">
+                                <label for="broker-phone">Telefone de Atendimento</label>
+                                <input type="text" id="broker-phone" required placeholder="Ex: 5588999999999">
+                            </div>
+                            <div class="form-group">
+                                <label for="broker-site-url">URL Base de Scraping</label>
+                                <input type="url" id="broker-site-url" required placeholder="Ex: https://www.exataservicos.net">
+                            </div>
+                            <div class="form-group">
+                                <label for="broker-bot-name">Nome do Atendente Virtual (Bot)</label>
+                                <input type="text" id="broker-bot-name" required value="Ana" placeholder="Ex: Ana">
+                            </div>
+                            <div class="form-group form-row-checkbox">
+                                <label for="broker-active" class="checkbox-label">
+                                    <input type="checkbox" id="broker-active" checked>
+                                    Perfil Ativo no Sistema
+                                </label>
+                            </div>
+                            <div class="form-actions">
+                                <button type="button" id="btn-clear-broker-form" class="btn btn-secondary">Limpar</button>
+                                <button type="submit" class="btn btn-primary">Salvar Perfil</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tab Content: Subscriptions -->
+            <section id="tab-content-subscriptions" class="tab-content">
+                <div class="glass-card filter-bar">
+                    <h3>Assinaturas de Alertas de Imóveis</h3>
+                    <p class="text-muted">Usuários que solicitaram notificações automáticas via comando "alertar"</p>
+                    <button id="btn-refresh-subs" class="btn btn-primary btn-auto">Atualizar Lista</button>
+                </div>
+
+                <div class="glass-card table-card">
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Telefone do Cliente</th>
+                                    <th>Finalidade (Intent)</th>
+                                    <th>Tipo de Imóvel</th>
+                                    <th>Bairro</th>
+                                    <th>Valor Máximo</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="subs-table-body">
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted">Carregando assinaturas ativas...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- JS App -->
+    <script src="/admin/app.js"></script>
+</body>
+</html>

@@ -27,6 +27,6 @@ class IntentHandler(BaseHandler):
         nome = session.client_name or "cliente"
         await self.message_gateway.send_text(
             session.phone,
-            f"Por favor, {nome}, digite **Locação** se você deseja alugar ou **Venda** se deseja comprar um imóvel."
+            f"Por favor, {nome}, digite **Locação** se você deseja alugar ou **Venda** se deseja comprar um imóvel.",
         )
         return False

@@ -1,3 +1,4 @@
+from typing import Any
 from src.domain.repositories.i_message_gateway import IMessageGateway
 
 
@@ -5,9 +6,9 @@ class SpyMessageGateway(IMessageGateway):
     """Implementação espiã (Spy) do gateway de mensagens para verificar chamadas em testes unitários."""
 
     def __init__(self) -> None:
-        self.sent_texts: list[dict] = []
-        self.sent_images: list[dict] = []
-        self.sent_typings: list[dict] = []
+        self.sent_texts: list[dict[str, Any]] = []
+        self.sent_images: list[dict[str, Any]] = []
+        self.sent_typings: list[dict[str, Any]] = []
 
     async def send_text(self, phone: str, text: str, typing_delay: float = 1.2) -> None:
         """Registra o envio de uma mensagem de texto."""

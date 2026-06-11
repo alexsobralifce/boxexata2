@@ -36,7 +36,7 @@ class ExataPropertyRepository(IPropertyRepository):
 
     def __init__(
         self,
-        cache: Optional[MemoryCache] = None,
+        cache: Optional[Any] = None,
         rate_limiter: Optional[RateLimiter] = None,
     ) -> None:
         self.cache = cache or MemoryCache(default_ttl_seconds=settings.cache_ttl_minutes * 60)
@@ -48,6 +48,15 @@ class ExataPropertyRepository(IPropertyRepository):
             )
         }
         self.timeout = 15.0
+
+    @property
+    def site_base_url(self) -> str:
+        """Retorna a URL base do site de scraping de forma dinâmica do contexto ativo."""
+        from src.shared.context import get_current_broker
+        broker = get_current_broker()
+        if broker and broker.site_base_url:
+            return broker.site_base_url
+        return settings.site_base_url
 
     def _map_property_type_to_code(self, property_type: Optional[str]) -> Optional[int]:
         """Mapeia a string descritiva do tipo de imóvel para o código interno do site."""
@@ -134,11 +143,11 @@ class ExataPropertyRepository(IPropertyRepository):
     async def _scrape_all_basic_listings(self) -> dict[str, dict[str, Any]]:
         """Busca a listagem completa em imovel.php e constrói dicionário por ID."""
         cache_key = "all_basic_listings"
-        cached = self.cache.get(cache_key)
+        cached = await self.cache.get(cache_key)
         if cached is not None:
             return cast(dict[str, dict[str, Any]], cached)
 
-        url = f"{settings.site_base_url}/imovel.php"
+        url = f"{self.site_base_url}/imovel.php"
         try:
             html = await self._fetch_html(url)
         except Exception as e:
@@ -164,7 +173,7 @@ class ExataPropertyRepository(IPropertyRepository):
             src_val = img_tag.get("src") if img_tag else None
             cover_image = src_val if src_val and not isinstance(src_val, list) else ""
             if cover_image and not cover_image.startswith("http"):
-                cover_image = f"{settings.site_base_url}/{cover_image}"
+                cover_image = f"{self.site_base_url}/{cover_image}"
 
             # Parsing text-based key-values inside the mold box
             text_parts = div.get_text("|", strip=True).split("|")
@@ -238,10 +247,10 @@ class ExataPropertyRepository(IPropertyRepository):
                 "neighborhood": neighborhood,
                 "price": price_val,
                 "cover_image": cover_image,
-                "url": f"{settings.site_base_url}/{href}",
+                "url": f"{self.site_base_url}/{href}",
             }
 
-        self.cache.set(cache_key, listings)
+        await self.cache.set(cache_key, listings)
         return listings
 
     async def find_by_preferences(self, session: Session) -> list[PropertyListing]:
@@ -263,12 +272,12 @@ class ExataPropertyRepository(IPropertyRepository):
         # 2. Se o tipo do imóvel for especificado e mapeável, filtra pelos IDs desse tipo
         if tipo_codigo is not None:
             cache_key = f"listings_type_{tipo_codigo}"
-            cached_ids = self.cache.get(cache_key)
+            cached_ids = await self.cache.get(cache_key)
 
             if cached_ids is not None:
                 filtered_ids = cached_ids
             else:
-                url = f"{settings.site_base_url}/resultado_imovel.php?codigo={tipo_codigo}"
+                url = f"{self.site_base_url}/resultado_imovel.php?codigo={tipo_codigo}"
                 try:
                     html = await self._fetch_html(url)
                     soup = BeautifulSoup(html, "html.parser")
@@ -279,17 +288,17 @@ class ExataPropertyRepository(IPropertyRepository):
                             href_val = a_tag.get("href")
                             if href_val and not isinstance(href_val, list):
                                 href = href_val
-                                pid = (
-                                    href.split("codigo=")[-1]
-                                    if "codigo=" in href
-                                    else ""
-                                )
+                                pid = href.split("codigo=")[-1] if "codigo=" in href else ""
                                 if pid:
                                     current_ids.add(pid)
-                    self.cache.set(cache_key, current_ids)
+                    await self.cache.set(cache_key, current_ids)
                     filtered_ids = current_ids
                 except Exception as e:
-                    logger.error("Erro ao buscar filtragem por tipo de imóvel", code=tipo_codigo, error=str(e))
+                    logger.error(
+                        "Erro ao buscar filtragem por tipo de imóvel",
+                        code=tipo_codigo,
+                        error=str(e),
+                    )
                     filtered_ids = None
 
         # 3. Monta a lista final combinando as duas fontes de dados
@@ -345,7 +354,7 @@ class ExataPropertyRepository(IPropertyRepository):
     async def find_by_id(self, property_id: str) -> Optional[PropertyListing]:
         """Busca informações detalhadas de um imóvel pelo seu ID, com suporte a cache."""
         cache_key = f"property_detail_{property_id}"
-        cached = self.cache.get(cache_key)
+        cached = await self.cache.get(cache_key)
         if cached is not None:
             logger.info("Recuperando imóvel detalhado do cache", id=property_id)
             return cast(Optional[PropertyListing], cached)
@@ -354,7 +363,7 @@ class ExataPropertyRepository(IPropertyRepository):
         all_basics = await self._scrape_all_basic_listings()
         basic = all_basics.get(property_id)
 
-        url = f"{settings.site_base_url}/detalhe_imovel.php?codigo={property_id}"
+        url = f"{self.site_base_url}/detalhe_imovel.php?codigo={property_id}"
         try:
             html = await self._fetch_html(url)
         except Exception as e:
@@ -411,7 +420,7 @@ class ExataPropertyRepository(IPropertyRepository):
             if href_val and not isinstance(href_val, list):
                 href = href_val
                 if not href.startswith("http"):
-                    href = f"{settings.site_base_url}/{href}"
+                    href = f"{self.site_base_url}/{href}"
                 if href not in photos:
                     photos.append(href)
 
@@ -444,7 +453,9 @@ class ExataPropertyRepository(IPropertyRepository):
         listing = PropertyListing(
             property_id=property_id,
             ref=ref,
-            property_type=basic["property_type"] if basic and "property_type" in basic else "Imóvel",
+            property_type=basic["property_type"]
+            if basic and "property_type" in basic
+            else "Imóvel",
             address=full_address,
             neighborhood=neighborhood,
             value=Money(price_val),
@@ -454,5 +465,5 @@ class ExataPropertyRepository(IPropertyRepository):
             photos=photos,
         )
 
-        self.cache.set(cache_key, listing)
+        await self.cache.set(cache_key, listing)
         return listing

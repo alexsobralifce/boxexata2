@@ -19,11 +19,15 @@ class FakePropertyRepository(IPropertyRepository):
         results: list[PropertyListing] = []
         for prop in self.properties:
             # Filtro de finalidade (intent: Locação / Venda)
-            if session.intent and session.intent.lower().strip() not in prop.property_type.lower() and session.intent.lower().strip() not in (prop.ref or "").lower():
+            if (
+                session.intent
+                and session.intent.lower().strip() not in prop.property_type.lower()
+                and session.intent.lower().strip() not in (prop.ref or "").lower()
+            ):
                 # Nota: A finalidade fictícia pode vir no ref ou tipo no mockup, vamos fazer correspondência genérica
                 # ou verificar se o matching_preferences passa
                 pass
-            
+
             # Se matches_preferences do domínio retornar True, mantemos
             if prop.matches_preferences(
                 intent=session.intent,

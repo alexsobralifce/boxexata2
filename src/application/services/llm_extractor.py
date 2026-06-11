@@ -4,6 +4,7 @@ from openai import AsyncOpenAI
 
 from src.application.services.i_preference_extractor import IPreferenceExtractor
 from src.application.services.regex_extractor import RegexPreferenceExtractor
+from src.shared.circuit_breaker import CircuitBreaker
 from src.shared.config import settings
 from src.shared.logger import logger
 
@@ -15,9 +16,11 @@ class LLMPreferenceExtractor(IPreferenceExtractor):
         self,
         fallback_extractor: Optional[IPreferenceExtractor] = None,
         client: Optional[AsyncOpenAI] = None,
+        circuit_breaker: Optional[CircuitBreaker] = None,
     ) -> None:
         self.fallback = fallback_extractor or RegexPreferenceExtractor()
         self._client = client
+        self.circuit_breaker = circuit_breaker or CircuitBreaker(failure_threshold=3, recovery_timeout=60.0)
 
     def _get_client(self) -> Optional[AsyncOpenAI]:
         if self._client is not None:
@@ -36,7 +39,10 @@ class LLMPreferenceExtractor(IPreferenceExtractor):
             return None
 
         if not api_key:
-            logger.warning("Provedor de LLM configurado mas a chave de API correspondente está vazia.", provider=provider)
+            logger.warning(
+                "Provedor de LLM configurado mas a chave de API correspondente está vazia.",
+                provider=provider,
+            )
             return None
 
         self._client = AsyncOpenAI(api_key=api_key, base_url=base_url)
@@ -81,20 +87,27 @@ class LLMPreferenceExtractor(IPreferenceExtractor):
             "- Não invente informações. Se uma chave não estiver presente na mensagem ou histórico, retorne null."
         )
 
-        user_content = f"Histórico de conversas recente:\n{history_str}\n\nNova mensagem do cliente:\n{text}"
+        user_content = (
+            f"Histórico de conversas recente:\n{history_str}\n\nNova mensagem do cliente:\n{text}"
+        )
 
         try:
             logger.info("Realizando chamada para LLM", provider=provider, model=model)
-            response = await client.chat.completions.create(
-                model=model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_content},
-                ],
-                response_format={"type": "json_object"},
-                temperature=0.0,
-                timeout=10.0,
-            )
+
+            async def _make_api_call() -> Any:
+                assert client is not None
+                return await client.chat.completions.create(
+                    model=model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_content},
+                    ],
+                    response_format={"type": "json_object"},
+                    temperature=0.0,
+                    timeout=10.0,
+                )
+
+            response = await self.circuit_breaker.call(_make_api_call)
             content = response.choices[0].message.content
             if not content:
                 raise ValueError("Resposta vazia do LLM")
@@ -128,5 +141,8 @@ class LLMPreferenceExtractor(IPreferenceExtractor):
             return extracted
 
         except Exception as e:
-            logger.error("Falha ao extrair preferências com LLM. Utilizando fallback para Regex.", error=str(e))
+            logger.error(
+                "Falha ao extrair preferências com LLM. Utilizando fallback para Regex.",
+                error=str(e),
+            )
             return await self.fallback.extract(text, history)

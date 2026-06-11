@@ -1,33 +1,78 @@
 import asyncio
-from typing import Optional, Any
-from fastapi import FastAPI, BackgroundTasks, Request, HTTPException, Query
+from typing import Optional, Any, AsyncGenerator
+from fastapi import FastAPI, Request, HTTPException, Query
+from contextlib import asynccontextmanager
+import os
+from fastapi.staticfiles import StaticFiles
 from src.shared.config import settings
-from src.shared.container import create_container
 from src.shared.logger import logger
 from src.domain.entities.session import Session, ConversationStep
 from tests.fakes.spy_message_gateway import SpyMessageGateway
 from src.application.use_cases.handle_message import HandleMessageUseCase
+from src.presentation.admin_router import router as admin_router
+
+from src.shared.container import get_container
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    # Startup:
+    container = get_container()
+    
+    # Inicializa banco de dados se ativado (Fase 8A)
+    db_engine = container.get("db_engine")
+    if db_engine:
+        from sqlmodel import SQLModel
+        async with db_engine.begin() as conn:
+            await conn.run_sync(SQLModel.metadata.create_all)
+        logger.info("Tabelas do banco de dados inicializadas com sucesso")
+
+    from apscheduler.schedulers.asyncio import AsyncIOScheduler
+    scheduler = AsyncIOScheduler()
+    
+    notify_use_case = container["notify_new_listings"]
+    scheduler.add_job(
+        notify_use_case.execute,
+        "interval",
+        minutes=settings.notify_check_interval_minutes,
+        id="notify_new_listings",
+        replace_existing=True,
+    )
+    scheduler.start()
+    logger.info(
+        "Scheduler iniciado com sucesso",
+        interval_minutes=settings.notify_check_interval_minutes,
+    )
+    
+    yield
+    
+    # Shutdown:
+    scheduler.shutdown()
+    logger.info("Scheduler finalizado com sucesso")
+
+    if db_engine:
+        await db_engine.dispose()
+        logger.info("Pool de conexões do banco de dados finalizado com sucesso")
+
 
 app = FastAPI(
     title="ExataBot API",
     description="Webhook e API de testes para o chatbot imobiliário da Exata Serviços",
     version="0.3.0",
+    lifespan=lifespan,
 )
 
-_container = None
+# Inclui rotas administrativas protegidas por JWT (Fase 8C)
+app.include_router(admin_router)
 
-
-def get_container() -> dict:
-    global _container
-    if _container is None:
-        _container = create_container(settings)
-    return _container
+# Monta o diretório contendo o Dashboard administrativo na rota /admin
+static_dir = os.path.join(os.path.dirname(__file__), "static")
+app.mount("/admin", StaticFiles(directory=static_dir, html=True), name="static")
 
 
 @app.get("/health")
 async def health() -> dict[str, Any]:
     """Retorna o status geral do bot e configurações básicas."""
-    container = get_container()
     return {
         "status": "ok",
         "bot_name": settings.bot_name,
@@ -39,9 +84,7 @@ async def health() -> dict[str, Any]:
 
 @app.get("/test-scraping")
 async def test_scraping(
-    finalidade: str = "Locação",
-    bairro: str = "",
-    tipo: Optional[str] = None
+    finalidade: str = "Locação", bairro: str = "", tipo: Optional[str] = None
 ) -> list[dict[str, Any]]:
     """Endpoint de debug para testar o scraping diretamente no site."""
     container = get_container()
@@ -66,9 +109,10 @@ async def test_scraping(
 @app.post("/test-mensagem")
 async def test_mensagem(
     numero: str = Query(..., description="Número do telefone do remetente"),
-    mensagem: str = Query(..., description="Texto da mensagem enviada pelo remetente")
+    mensagem: str = Query(..., description="Texto da mensagem enviada pelo remetente"),
+    instancia: Optional[str] = Query(None, description="Nome da instância do corretor para multi-tenant"),
 ) -> dict[str, Any]:
-    """Simula o envio de uma mensagem pelo usuário e captura as mensagens de resposta da Ana."""
+    """Simula o envio de uma mensagem pelo usuário e captura as mensagens de resposta do bot."""
     container = get_container()
 
     # Usamos o SpyMessageGateway para interceptar e capturar o que a Ana responderia
@@ -80,7 +124,16 @@ async def test_mensagem(
         property_repo=container["property_repo"],
         message_gateway=spy_gateway,
         extractor=container["extractor"],
+        subscription_store=container["subscription_store"],
+        log_repo=container["log_repo"],
     )
+
+    profile = None
+    if instancia:
+        profile = await container["broker_repo"].get_by_instance(instancia)
+
+    from src.shared.context import set_current_broker, current_broker
+    token = set_current_broker(profile)
 
     try:
         # Ignora a verificação de horário para fins de teste manual local
@@ -90,12 +143,15 @@ async def test_mensagem(
             "phone": numero,
             "sent_texts": [item["text"] for item in spy_gateway.sent_texts],
             "sent_images": [
-                {"url": item["image_url"], "caption": item["caption"]} for item in spy_gateway.sent_images
+                {"url": item["image_url"], "caption": item["caption"]}
+                for item in spy_gateway.sent_images
             ],
         }
     except Exception as e:
         logger.error("Falha ao simular envio de mensagem", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        current_broker.reset(token)
 
 
 @app.post("/webhook")
@@ -150,9 +206,26 @@ async def webhook(request: Request) -> dict[str, str]:
     if not text:
         return {"status": "ignored", "reason": "Empty message content or unsupported message type"}
 
-    # Dispara o processamento em segundo plano para liberar o webhook da Evolution API imediatamente
-    container = get_container()
-    use_case = container["handle_message"]
-    asyncio.create_task(use_case.execute(phone, text))
+    # Extrai a instância de envio da Evolution API
+    instance_id = payload.get("instance", "")
+
+    # Define o processamento assíncrono isolado em segundo plano
+    async def run_with_broker_context(inst_id: str, client_phone: str, msg_text: str) -> None:
+        cont = get_container()
+        broker_repo = cont["broker_repo"]
+        # Carrega o perfil do corretor correspondente da instância
+        broker_profile = await broker_repo.get_by_instance(inst_id)
+
+        from src.shared.context import set_current_broker, current_broker
+        tok = set_current_broker(broker_profile)
+        try:
+            uc = cont["handle_message"]
+            await uc.execute(client_phone, msg_text)
+        except Exception as ex:
+            logger.error("Erro ao processar mensagem do webhook", error=str(ex), phone=client_phone)
+        finally:
+            current_broker.reset(tok)
+
+    asyncio.create_task(run_with_broker_context(instance_id, phone, text))
 
     return {"status": "processing"}

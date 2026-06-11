@@ -10,13 +10,21 @@ class EvolutionGateway(IMessageGateway):
 
     def __init__(self) -> None:
         self.base_url = settings.evolution_api_url.rstrip("/")
-        self.instance = settings.evolution_instance
         self.headers = {
             "apikey": settings.evolution_api_key,
             "Content-Type": "application/json",
         }
         self.timeout_send_text = 10.0
         self.timeout_send_media = 15.0
+
+    @property
+    def instance(self) -> str:
+        """Retorna o identificador da instância do WhatsApp dinamicamente do contexto ativo."""
+        from src.shared.context import get_current_broker
+        broker = get_current_broker()
+        if broker:
+            return broker.instance_id
+        return settings.evolution_instance
 
     def _format_phone(self, phone: str) -> str:
         """Formata o número de telefone no padrão esperado pela Evolution API (DDI + DDD + Número)."""
@@ -37,15 +45,23 @@ class EvolutionGateway(IMessageGateway):
             "delay": delay_ms,
         }
 
-        logger.info("Enviando mensagem de texto via WhatsApp", phone=formatted_phone, text_preview=text[:30])
+        logger.info(
+            "Enviando mensagem de texto via WhatsApp", phone=formatted_phone, text_preview=text[:30]
+        )
 
         try:
-            async with httpx.AsyncClient(headers=self.headers, timeout=self.timeout_send_text) as client:
+            async with httpx.AsyncClient(
+                headers=self.headers, timeout=self.timeout_send_text
+            ) as client:
                 response = await client.post(url, json=payload)
                 response.raise_for_status()
                 logger.info("Mensagem de texto enviada com sucesso", phone=formatted_phone)
         except Exception as e:
-            logger.error("Falha ao enviar mensagem de texto via Evolution API", phone=formatted_phone, error=str(e))
+            logger.error(
+                "Falha ao enviar mensagem de texto via Evolution API",
+                phone=formatted_phone,
+                error=str(e),
+            )
 
     async def send_image(self, phone: str, image_url: str, caption: str = "") -> None:
         """Envia uma imagem com uma legenda opcional."""
@@ -70,12 +86,16 @@ class EvolutionGateway(IMessageGateway):
         logger.info("Enviando imagem via WhatsApp", phone=formatted_phone, url=image_url)
 
         try:
-            async with httpx.AsyncClient(headers=self.headers, timeout=self.timeout_send_media) as client:
+            async with httpx.AsyncClient(
+                headers=self.headers, timeout=self.timeout_send_media
+            ) as client:
                 response = await client.post(url, json=payload)
                 response.raise_for_status()
                 logger.info("Imagem enviada com sucesso", phone=formatted_phone)
         except Exception as e:
-            logger.error("Falha ao enviar imagem via Evolution API", phone=formatted_phone, error=str(e))
+            logger.error(
+                "Falha ao enviar imagem via Evolution API", phone=formatted_phone, error=str(e)
+            )
 
     async def send_typing(self, phone: str, duration_ms: int = 1500) -> None:
         """Dispara o estado de digitando na conversa por um tempo determinado."""
@@ -88,12 +108,22 @@ class EvolutionGateway(IMessageGateway):
             "presence": "composing",
         }
 
-        logger.info("Disparando estado de digitando (composing)", phone=formatted_phone, duration=duration_ms)
+        logger.info(
+            "Disparando estado de digitando (composing)",
+            phone=formatted_phone,
+            duration=duration_ms,
+        )
 
         try:
-            async with httpx.AsyncClient(headers=self.headers, timeout=self.timeout_send_text) as client:
+            async with httpx.AsyncClient(
+                headers=self.headers, timeout=self.timeout_send_text
+            ) as client:
                 response = await client.post(url, json=payload)
                 response.raise_for_status()
                 logger.info("Estado de digitando enviado com sucesso", phone=formatted_phone)
         except Exception as e:
-            logger.error("Falha ao enviar estado de digitando via Evolution API", phone=formatted_phone, error=str(e))
+            logger.error(
+                "Falha ao enviar estado de digitando via Evolution API",
+                phone=formatted_phone,
+                error=str(e),
+            )

@@ -21,6 +21,26 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     deepseek_api_key: str = ""
 
+    # Redis (Fase 6)
+    redis_url: str = "redis://localhost:6379/0"
+    session_store_type: str = "memory"  # "memory" | "redis"
+    cache_type: str = "memory"          # "memory" | "redis"
+
+    # Alertas (Fase 7)
+    subscription_store_type: str = "memory"  # "memory" | "redis"
+    notify_check_interval_minutes: int = 15
+
+    # Logs de Mensagens (Fase 8A)
+    database_url: str = ""
+    message_log_enabled: bool = False
+
+    # Painel Admin e Segurança JWT (Fase 8C)
+    admin_username: str = "admin"
+    admin_password_hash: str = ""
+    jwt_secret_key: str = "exatabot_super_secret_key_change_me"
+    jwt_algorithm: str = "HS256"
+    jwt_expiration_minutes: int = 120
+
     model_config = SettingsConfigDict(
         env_file=(".env", ".env.local"),
         env_file_encoding="utf-8",
@@ -34,5 +54,6 @@ try:
 except Exception:
     # Fallback para testes se as variáveis obrigatórias não estiverem no ambiente
     import os
+
     os.environ["EVOLUTION_API_KEY"] = "mock_key_for_testing"
     settings = Settings()

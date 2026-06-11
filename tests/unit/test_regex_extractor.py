@@ -1,10 +1,11 @@
 import pytest
 from src.application.services.regex_extractor import RegexPreferenceExtractor
 
+
 @pytest.mark.asyncio
 async def test_extract_name() -> None:
     extractor = RegexPreferenceExtractor()
-    
+
     res = await extractor.extract("Olá, me chamo Francisco", [])
     assert res.get("client_name") == "Francisco"
 
@@ -18,7 +19,7 @@ async def test_extract_name() -> None:
 @pytest.mark.asyncio
 async def test_extract_intent() -> None:
     extractor = RegexPreferenceExtractor()
-    
+
     res = await extractor.extract("quero alugar uma casa", [])
     assert res.get("intent") == "Locação"
 
@@ -29,7 +30,7 @@ async def test_extract_intent() -> None:
 @pytest.mark.asyncio
 async def test_extract_property_type() -> None:
     extractor = RegexPreferenceExtractor()
-    
+
     res = await extractor.extract("quero ver kitnets", [])
     assert res.get("property_type") == "Quitinete"
 
@@ -43,7 +44,7 @@ async def test_extract_property_type() -> None:
 @pytest.mark.asyncio
 async def test_extract_neighborhood() -> None:
     extractor = RegexPreferenceExtractor()
-    
+
     res = await extractor.extract("imovel no centro de sobral", [])
     assert res.get("neighborhood") == "Centro"
 
@@ -54,7 +55,7 @@ async def test_extract_neighborhood() -> None:
 @pytest.mark.asyncio
 async def test_extract_max_value() -> None:
     extractor = RegexPreferenceExtractor()
-    
+
     res = await extractor.extract("aluguel ate 1500 reais", [])
     assert res.get("max_value") == 1500.0
 

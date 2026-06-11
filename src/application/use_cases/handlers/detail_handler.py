@@ -19,7 +19,7 @@ class DetailHandler(BaseHandler):
             session.transition_to(ConversationStep.INTENT)
             await self.message_gateway.send_text(
                 session.phone,
-                "Certo, vamos começar de novo! Você busca um imóvel para **Locação** ou **Venda**?"
+                "Certo, vamos começar de novo! Você busca um imóvel para **Locação** ou **Venda**?",
             )
             return False
 
@@ -31,9 +31,7 @@ class DetailHandler(BaseHandler):
             offset = session.result_offset
             slice_results = session.results[offset : offset + page_size]
 
-            response_lines = [
-                "Encontrei esses imóveis que encaixam nas suas preferências:\n"
-            ]
+            response_lines = ["Encontrei esses imóveis que encaixam nas suas preferências:\n"]
             for idx, item in enumerate(slice_results):
                 num = offset + idx + 1
                 price = item.get("value", 0.0)
@@ -56,8 +54,8 @@ class DetailHandler(BaseHandler):
         await self.message_gateway.send_text(
             session.phone,
             "Para agendar uma visita ou falar com um corretor, clique no link abaixo:\n"
-            f"https://wa.me/558836113000\n"
+            "https://wa.me/558836113000\n"
             "Ou ligue para o telefone fixo: (88) 3611-3000.\n\n"
-            "Digite 'voltar' para retornar à lista de imóveis ou 'reiniciar' para fazer uma nova busca."
+            "Digite 'voltar' para retornar à lista de imóveis ou 'reiniciar' para fazer uma nova busca.",
         )
         return False

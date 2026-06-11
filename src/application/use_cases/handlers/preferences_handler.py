@@ -8,7 +8,9 @@ from src.shared.logger import logger
 class PreferencesHandler(BaseHandler):
     """Handler para a etapa PREFERENCES da conversa."""
 
-    def __init__(self, property_repo: IPropertyRepository, message_gateway: IMessageGateway) -> None:
+    def __init__(
+        self, property_repo: IPropertyRepository, message_gateway: IMessageGateway
+    ) -> None:
         self.property_repo = property_repo
         self.message_gateway = message_gateway
 
@@ -17,7 +19,7 @@ class PreferencesHandler(BaseHandler):
         if not session.property_type:
             await self.message_gateway.send_text(
                 session.phone,
-                "Qual tipo de imóvel você procura? (Ex: casa, apartamento, quitinete, etc.)"
+                "Qual tipo de imóvel você procura? (Ex: casa, apartamento, quitinete, etc.)",
             )
             return False
 
@@ -25,7 +27,7 @@ class PreferencesHandler(BaseHandler):
         if not session.neighborhood:
             await self.message_gateway.send_text(
                 session.phone,
-                f"Entendi! E em qual bairro de Sobral você busca {session.property_type.lower()}? (Ex: Centro, Derby, Junco, Renato Parente, etc.)"
+                f"Entendi! E em qual bairro de Sobral você busca {session.property_type.lower()}? (Ex: Centro, Derby, Junco, Renato Parente, etc.)",
             )
             return False
 
@@ -46,19 +48,28 @@ class PreferencesHandler(BaseHandler):
             logger.error("Erro ao buscar imóveis no repositório", error=str(e))
             await self.message_gateway.send_text(
                 session.phone,
-                "Desculpe, tive um problema ao pesquisar no site da Exata Serviços no momento. Por favor, tente novamente em alguns instantes."
+                "Desculpe, tive um problema ao pesquisar no site da Exata Serviços no momento. Por favor, tente novamente em alguns instantes.",
             )
             return False
 
         if not results:
             intent_label = "alugar" if session.intent == "Locação" else "comprar"
-            valor_label = f" com valor até R$ {session.max_value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if session.max_value else ""
+            valor_label = (
+                f" com valor até R$ {session.max_value:,.2f}".replace(",", "X")
+                .replace(".", ",")
+                .replace("X", ".")
+                if session.max_value
+                else ""
+            )
             msg = (
                 f"Não encontrei nenhuma opção de {session.property_type.lower()} para {intent_label} "
                 f"no bairro {session.neighborhood}{valor_label} no momento.\n\n"
-                "Gostaria de tentar buscar com outros critérios? Digite 'começar' ou qualquer mensagem para reiniciar."
+                "Quer que eu te avise assim que novos imóveis com esse perfil surgirem no site? Digite **alertar** para ativar.\n"
+                "Se preferir fazer uma nova busca com outros critérios, digite **começar**."
             )
-            session.reset_search()
+            session.results = []
+            session.result_offset = 0
+            session.transition_to(ConversationStep.SHOWING)
             await self.message_gateway.send_text(session.phone, msg)
             return False
 
@@ -71,9 +82,7 @@ class PreferencesHandler(BaseHandler):
         page_size = 3
         slice_results = results[:page_size]
 
-        response_lines = [
-            "Encontrei esses imóveis que encaixam nas suas preferências:\n"
-        ]
+        response_lines = ["Encontrei esses imóveis que encaixam nas suas preferências:\n"]
         for idx, item in enumerate(slice_results):
             num = idx + 1
             price_fmt = item.value.formatted()
@@ -85,7 +94,7 @@ class PreferencesHandler(BaseHandler):
             )
 
         response_lines.append(
-            "Digite o número do imóvel para ver mais detalhes (ex: 1, 2, 3), 'mais' para ver outros, ou 'reiniciar' para começar de novo."
+            "Digite o número do imóvel para ver mais detalhes (ex: 1, 2, 3), 'mais' para ver outros, 'alertar' para receber avisos de novas opções, ou 'reiniciar' para começar de novo."
         )
 
         await self.message_gateway.send_text(session.phone, "\n".join(response_lines))

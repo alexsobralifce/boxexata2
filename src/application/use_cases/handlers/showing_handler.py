@@ -3,6 +3,7 @@ from src.application.use_cases.handlers.base_handler import BaseHandler
 from src.domain.entities.session import Session, ConversationStep
 from src.domain.repositories.i_message_gateway import IMessageGateway
 from src.domain.repositories.i_property_repository import IPropertyRepository
+from src.domain.repositories.i_subscription_store import ISubscriptionStore
 from src.shared.config import settings
 from src.shared.logger import logger
 
@@ -10,9 +11,15 @@ from src.shared.logger import logger
 class ShowingHandler(BaseHandler):
     """Handler para a etapa SHOWING (exibição de resultados e seleção)."""
 
-    def __init__(self, property_repo: IPropertyRepository, message_gateway: IMessageGateway) -> None:
+    def __init__(
+        self,
+        property_repo: IPropertyRepository,
+        message_gateway: IMessageGateway,
+        subscription_store: ISubscriptionStore,
+    ) -> None:
         self.property_repo = property_repo
         self.message_gateway = message_gateway
+        self.subscription_store = subscription_store
 
     async def handle(self, session: Session, text: str) -> bool:
         clean_text = text.lower().strip()
@@ -23,7 +30,75 @@ class ShowingHandler(BaseHandler):
             session.transition_to(ConversationStep.INTENT)
             await self.message_gateway.send_text(
                 session.phone,
-                "Certo, vamos começar de novo! Você busca um imóvel para **Locação** ou **Venda**?"
+                "Certo, vamos começar de novo! Você busca um imóvel para **Locação** ou **Venda**?",
+            )
+            return False
+
+        # Comando "alertar" / "alerta" / "ativar alerta" / "receber alertas"
+        if clean_text in (
+            "alertar",
+            "alerta",
+            "alertas",
+            "receber alerta",
+            "receber alertas",
+            "ativar alerta",
+            "ativar alertas",
+        ):
+            if not session.intent or not session.property_type or not session.neighborhood:
+                await self.message_gateway.send_text(
+                    session.phone,
+                    "Você precisa definir um tipo de imóvel e bairro antes de assinar alertas. Digite 'reiniciar' para fazer uma busca completa.",
+                )
+                return False
+
+            from src.domain.entities.subscription import Subscription
+            subscription = Subscription(
+                phone=session.phone,
+                intent=session.intent,
+                property_type=session.property_type,
+                neighborhood=session.neighborhood,
+                max_value=session.max_value,
+            )
+            await self.subscription_store.save(subscription)
+
+            price_info = (
+                f" até *R$ {session.max_value:,.2f}*".replace(",", "X")
+                .replace(".", ",")
+                .replace("X", ".")
+                if session.max_value
+                else ""
+            )
+            await self.message_gateway.send_text(
+                session.phone,
+                f"Perfeito, {session.client_name or 'amigo(a)'}! Assinatura de alertas ativada. Vou te avisar "
+                f"assim que surgirem novos imóveis do tipo *{session.property_type}* no bairro *{session.neighborhood}* "
+                f"para *{session.intent}*{price_info}.\n\n"
+                "Para cancelar os alertas a qualquer momento, basta digitar 'desativar alerta'.",
+            )
+            return False
+
+        # Comando "desativar alerta" / "cancelar alerta" / "remover alerta"
+        if clean_text in (
+            "desativar alerta",
+            "desativar alertas",
+            "cancelar alerta",
+            "cancelar alertas",
+            "remover alerta",
+            "remover alertas",
+        ):
+            await self.subscription_store.delete(session.phone)
+            await self.message_gateway.send_text(
+                session.phone,
+                "Seus alertas de novos imóveis foram cancelados com sucesso. "
+                "Se precisar de novos alertas no futuro, basta realizar uma busca e digitar 'alertar'.",
+            )
+            return False
+
+        # Se houver 0 resultados na busca, os únicos comandos permitidos além de alertar/desativar são reiniciar
+        if len(session.results) == 0:
+            await self.message_gateway.send_text(
+                session.phone,
+                "Não há imóveis disponíveis com este perfil para exibição. Digite 'alertar' para assinar alertas ou 'reiniciar' para tentar com outros critérios.",
             )
             return False
 
@@ -36,13 +111,13 @@ class ShowingHandler(BaseHandler):
                 session.result_offset = next_offset
                 slice_results = session.results[next_offset : next_offset + page_size]
 
-                response_lines = [
-                    "Aqui estão mais algumas opções:\n"
-                ]
+                response_lines = ["Aqui estão mais algumas opções:\n"]
                 for idx, item in enumerate(slice_results):
                     num = next_offset + idx + 1
                     price = item.get("value", 0.0)
-                    price_fmt = f"R$ {price:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                    price_fmt = (
+                        f"R$ {price:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                    )
                     response_lines.append(
                         f"*{num}. {item.get('property_type')} no {item.get('neighborhood')}*\n"
                         f"Valor: {price_fmt}\n"
@@ -52,13 +127,13 @@ class ShowingHandler(BaseHandler):
 
                 next_num_example = next_offset + 1
                 response_lines.append(
-                    f"Digite o número do imóvel para ver mais detalhes (ex: {next_num_example}), 'mais' para ver outros, ou 'reiniciar' para começar de novo."
+                    f"Digite o número do imóvel para ver mais detalhes (ex: {next_num_example}), 'mais' para ver outros, 'alertar' para receber alertas deste perfil, ou 'reiniciar' para começar de novo."
                 )
                 await self.message_gateway.send_text(session.phone, "\n".join(response_lines))
             else:
                 await self.message_gateway.send_text(
                     session.phone,
-                    "Não encontrei mais imóveis com essas preferências no site. Digite 'reiniciar' para fazer uma nova busca."
+                    "Não encontrei mais imóveis com essas preferências no site. Digite 'reiniciar' para fazer uma nova busca.",
                 )
             return False
 
@@ -77,7 +152,7 @@ class ShowingHandler(BaseHandler):
                     if not listing:
                         await self.message_gateway.send_text(
                             session.phone,
-                            "Desculpe, não consegui carregar os detalhes desse imóvel no momento. Digite 'voltar' para tentar novamente."
+                            "Desculpe, não consegui carregar os detalhes desse imóvel no momento. Digite 'voltar' para tentar novamente.",
                         )
                         return False
 
@@ -89,16 +164,20 @@ class ShowingHandler(BaseHandler):
                     for photo in photos_to_send:
                         if photo:
                             try:
-                                await self.message_gateway.send_image(session.phone, photo, f"Foto do imóvel Ref {listing.ref}")
+                                await self.message_gateway.send_image(
+                                    session.phone, photo, f"Foto do imóvel Ref {listing.ref}"
+                                )
                             except Exception as e:
-                                logger.warning("Falha ao enviar imagem do imóvel", url=photo, error=str(e))
+                                logger.warning(
+                                    "Falha ao enviar imagem do imóvel", url=photo, error=str(e)
+                                )
 
                     detail_lines = [
                         f"🏡 *Detalhes do Imóvel — Ref: {listing.ref}*",
                         f"Tipo: {listing.property_type}",
                         f"Endereço: {listing.address}",
                         f"Bairro: {listing.neighborhood}",
-                        f"Valor: {listing.value.formatted()}"
+                        f"Valor: {listing.value.formatted()}",
                     ]
                     if listing.fees:
                         detail_lines.append(f"Taxas (Condomínio/IPTU): {listing.fees.formatted()}")
@@ -122,6 +201,6 @@ class ShowingHandler(BaseHandler):
 
         await self.message_gateway.send_text(
             session.phone,
-            "Não entendi. Por favor, digite o número do imóvel desejado (ex: 1, 2, 3), 'mais' para ver mais opções, ou 'reiniciar' para começar uma nova busca."
+            "Não entendi. Por favor, digite o número do imóvel desejado (ex: 1, 2, 3), 'mais' para ver mais opções, 'alertar' para receber alertas de novos imóveis, ou 'reiniciar' para começar uma nova busca.",
         )
         return False
