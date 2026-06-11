@@ -1,0 +1,101 @@
+from datetime import datetime
+from src.domain.entities.session import ConversationStep
+from src.domain.repositories.i_session_store import ISessionStore
+from src.domain.repositories.i_property_repository import IPropertyRepository
+from src.domain.repositories.i_message_gateway import IMessageGateway
+from src.application.services.i_preference_extractor import IPreferenceExtractor
+from src.application.use_cases.handlers.start_handler import StartHandler
+from src.application.use_cases.handlers.intent_handler import IntentHandler
+from src.application.use_cases.handlers.preferences_handler import PreferencesHandler
+from src.application.use_cases.handlers.showing_handler import ShowingHandler
+from src.application.use_cases.handlers.detail_handler import DetailHandler
+from src.shared.config import settings
+from src.shared.logger import logger
+
+
+class HandleMessageUseCase:
+    """Orquestrador principal do fluxo de mensagens do ExataBot."""
+
+    def __init__(
+        self,
+        session_store: ISessionStore,
+        property_repo: IPropertyRepository,
+        message_gateway: IMessageGateway,
+        extractor: IPreferenceExtractor,
+    ) -> None:
+        self._session_store = session_store
+        self._property_repo = property_repo
+        self._message_gateway = message_gateway
+        self._extractor = extractor
+
+        self._handlers = {
+            ConversationStep.START: StartHandler(message_gateway),
+            ConversationStep.INTENT: IntentHandler(message_gateway),
+            ConversationStep.PREFERENCES: PreferencesHandler(property_repo, message_gateway),
+            ConversationStep.SHOWING: ShowingHandler(property_repo, message_gateway),
+            ConversationStep.DETAIL: DetailHandler(message_gateway),
+        }
+
+    def _is_within_business_hours(self) -> bool:
+        now = datetime.now()
+        # Segunda (0) a Sexta (4)
+        if now.weekday() in range(0, 5):
+            return settings.business_hours_start <= now.hour < settings.business_hours_end
+        return False
+
+    async def execute(self, phone: str, text: str, bypass_hours: bool = False) -> None:
+        """Processa uma mensagem recebida de um remetente, gerenciando a máquina de estados e enviando respostas."""
+        logger.info("Executando caso de uso de tratamento de mensagem", phone=phone, text=text)
+
+        # 1. Verifica horário de atendimento
+        if not bypass_hours and not self._is_within_business_hours():
+            logger.info("Fora do horário de atendimento. Enviando mensagem padrão.", phone=phone)
+            await self._message_gateway.send_text(
+                phone,
+                "Olá! No momento estamos fora do nosso horário de atendimento (Segunda a Sexta, das 08h às 18h). "
+                "Deixe sua mensagem e responderemos assim que retornarmos!"
+            )
+            return
+
+        # 2. Busca ou cria a sessão do cliente
+        session = await self._session_store.get_or_create(phone)
+        session.increment_messages()
+
+        # Adiciona a mensagem recebida ao histórico
+        session.history.append(f"Cliente: {text}")
+        session.history = session.history[-20:]
+
+        # 3. Executa a extração de preferências caso a conversa não esteja nas etapas de paginação/detalhe
+        if session.step not in (ConversationStep.SHOWING, ConversationStep.DETAIL):
+            extracted = await self._extractor.extract(text, [line for line in session.history if "Cliente:" in line])
+            session.update_preferences(**extracted)
+
+        # 4. Loop da máquina de estados
+        max_transitions = 5
+        transition_count = 0
+
+        while transition_count < max_transitions:
+            transition_count += 1
+            current_step = session.step
+
+            handler = self._handlers.get(current_step)
+            if not handler:
+                logger.error("Nenhum handler registrado para o estado", step=current_step)
+                break
+
+            logger.info(
+                "Processando estado da conversa",
+                phone=phone,
+                step=current_step,
+                transition_count=transition_count,
+            )
+
+            should_continue = await handler.handle(session, text)
+
+            # Se o estado não mudou ou se o handler determinou que não devemos prosseguir de imediato, interrompe
+            if session.step == current_step or not should_continue:
+                break
+
+        # 5. Salva o estado atualizado da sessão
+        await self._session_store.save(session)
+        logger.info("Sessão salva com sucesso", phone=phone, step=session.step)
