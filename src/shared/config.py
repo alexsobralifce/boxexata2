@@ -2,10 +2,18 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    # Evolution API
+    # Evolution API (gateway padrão)
     evolution_api_url: str = "http://localhost:8080"
     evolution_api_key: str = ""
     evolution_instance: str = "exatabot"
+
+    # Z-API (gateway alternativo)
+    zapi_instance_id: str = ""   # ID da instância no painel Z-API
+    zapi_token: str = ""          # Token da instância no painel Z-API
+    zapi_client_token: str = ""  # Client-Token da conta Z-API (header de auth)
+
+    # Provedor de WhatsApp ativo: "evolution" ou "zapi"
+    whatsapp_provider: str = "evolution"
 
     # Bot
     bot_name: str = "Ana"

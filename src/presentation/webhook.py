@@ -154,78 +154,60 @@ async def test_mensagem(
         current_broker.reset(token)
 
 
+async def _process_webhook_message(instance_id: str, phone: str, text: str):
+    """Executa o processamento da mensagem com o contexto do broker correto."""
+    cont = get_container()
+    broker_repo = cont["broker_repo"]
+    broker_profile = await broker_repo.get_by_instance(instance_id)
+
+    from src.shared.context import set_current_broker, current_broker
+    tok = set_current_broker(broker_profile)
+    try:
+        uc = cont["handle_message"]
+        await uc.execute(phone, text)
+    except Exception as ex:
+        logger.error("Erro ao processar mensagem do webhook", error=str(ex), phone=phone)
+    finally:
+        current_broker.reset(tok)
+
+
 @app.post("/webhook")
 async def webhook(request: Request) -> dict[str, str]:
-    """Recebe eventos e mensagens enviados pela Evolution API v2."""
-    # Valida apikey se fornecido nas configurações
-    if settings.evolution_api_key:
-        api_key_header = request.headers.get("apikey")
-        if api_key_header != settings.evolution_api_key:
-            logger.warning("Tentativa de acesso ao webhook com apikey inválido ou ausente")
-            raise HTTPException(status_code=401, detail="Unauthorized api key")
+    """Recebe eventos da Evolution API v2."""
+    if settings.evolution_api_key and request.headers.get("apikey") != settings.evolution_api_key:
+        raise HTTPException(status_code=401, detail="Unauthorized")
 
-    try:
-        payload = await request.json()
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid JSON body")
+    payload = await request.json()
+    if payload.get("event") != "messages.upsert" or payload.get("data", {}).get("key", {}).get("fromMe"):
+        return {"status": "ignored"}
 
-    event = payload.get("event")
-    if event != "messages.upsert":
-        return {"status": "ignored", "reason": f"Event '{event}' is not messages.upsert"}
-
-    data = payload.get("data", {})
-    key = data.get("key", {})
-    from_me = key.get("fromMe", False)
-    remote_jid = key.get("remoteJid", "")
-
-    # Ignora mensagens enviadas pelo próprio bot
-    if from_me:
-        return {"status": "ignored", "reason": "Message is fromMe"}
-
-    # Ignora mensagens de grupos
+    data = payload["data"]
+    remote_jid = data["key"]["remoteJid"]
     if "@g.us" in remote_jid:
-        return {"status": "ignored", "reason": "Message is from a group"}
+        return {"status": "ignored"}
 
     phone = remote_jid.split("@")[0]
     message = data.get("message", {})
+    text = message.get("conversation") or message.get("extendedTextMessage", {}).get("text", "")
+    
+    if text:
+        asyncio.create_task(_process_webhook_message(payload.get("instance", ""), phone, text.strip()))
+    
+    return {"status": "processing"}
 
-    # Extrai o conteúdo de texto da mensagem dependendo do tipo
-    text = ""
-    if "conversation" in message:
-        text = message["conversation"]
-    elif "extendedTextMessage" in message:
-        text = message["extendedTextMessage"].get("text", "")
-    elif "buttonsResponseMessage" in message:
-        btn_resp = message["buttonsResponseMessage"]
-        text = btn_resp.get("selectedDisplayText", btn_resp.get("selectedButtonId", ""))
-    elif "listResponseMessage" in message:
-        list_resp = message["listResponseMessage"]
-        text = list_resp.get("title", "")
 
-    text = text.strip()
-    if not text:
-        return {"status": "ignored", "reason": "Empty message content or unsupported message type"}
+@app.post("/webhook/zapi")
+async def webhook_zapi(request: Request) -> dict[str, str]:
+    """Recebe eventos da Z-API."""
+    payload = await request.json()
+    
+    # Z-API structure: sender, message { textContent }, instanceId
+    phone = payload.get("sender", "").replace("@c.us", "")
+    text = payload.get("message", {}).get("textContent", {}).get("text", "")
+    instance_id = payload.get("instanceId", "")
 
-    # Extrai a instância de envio da Evolution API
-    instance_id = payload.get("instance", "")
+    if not phone or not text:
+        return {"status": "ignored"}
 
-    # Define o processamento assíncrono isolado em segundo plano
-    async def run_with_broker_context(inst_id: str, client_phone: str, msg_text: str) -> None:
-        cont = get_container()
-        broker_repo = cont["broker_repo"]
-        # Carrega o perfil do corretor correspondente da instância
-        broker_profile = await broker_repo.get_by_instance(inst_id)
-
-        from src.shared.context import set_current_broker, current_broker
-        tok = set_current_broker(broker_profile)
-        try:
-            uc = cont["handle_message"]
-            await uc.execute(client_phone, msg_text)
-        except Exception as ex:
-            logger.error("Erro ao processar mensagem do webhook", error=str(ex), phone=client_phone)
-        finally:
-            current_broker.reset(tok)
-
-    asyncio.create_task(run_with_broker_context(instance_id, phone, text))
-
+    asyncio.create_task(_process_webhook_message(instance_id, phone, text.strip()))
     return {"status": "processing"}

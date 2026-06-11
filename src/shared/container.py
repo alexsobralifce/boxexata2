@@ -4,6 +4,7 @@ from src.infrastructure.scraper.exata_property_repository import (
     RateLimiter,
 )
 from src.infrastructure.whatsapp.evolution_gateway import EvolutionGateway
+from src.infrastructure.whatsapp.zapi_gateway import ZApiGateway
 from src.infrastructure.persistence.memory_session_store import MemorySessionStore
 from src.infrastructure.cache.memory_cache import MemoryCache
 from src.application.services.i_preference_extractor import IPreferenceExtractor
@@ -50,7 +51,12 @@ def create_container(settings: Settings) -> dict[str, Any]:
         rate_limiter=rate_limiter,
     )
 
-    message_gateway: IMessageGateway = EvolutionGateway()
+    # Seleciona o gateway de WhatsApp conforme a variável WHATSAPP_PROVIDER
+    message_gateway: IMessageGateway
+    if settings.whatsapp_provider == "zapi":
+        message_gateway = ZApiGateway()
+    else:
+        message_gateway = EvolutionGateway()
 
     # Inicializa Session Store
     session_store: Any
