@@ -1,6 +1,7 @@
 from src.application.use_cases.handlers.base_handler import BaseHandler
 from src.domain.entities.session import Session, ConversationStep
 from src.domain.repositories.i_message_gateway import IMessageGateway
+from src.application.services import humanizer
 
 
 class StartHandler(BaseHandler):
@@ -24,13 +25,8 @@ class StartHandler(BaseHandler):
         # Se o nome do cliente já foi extraído
         if session.client_name:
             session.transition_to(ConversationStep.INTENT)
-            await self.message_gateway.send_text(
-                session.phone,
-                f"Prazer, {session.client_name}! Eu sou a {bot_name}, atendente virtual da {broker_name}.",
-            )
-            await self.message_gateway.send_text(
-                session.phone, "Você está buscando um imóvel para **Locação** ou **Venda**?"
-            )
+            welcome_msg = humanizer.get_welcome_returning_phrase(session.client_name, bot_name, broker_name)
+            await self.message_gateway.send_text(session.phone, welcome_msg)
             return False
 
         # Verifica se o texto é uma saudação simples
@@ -45,17 +41,17 @@ class StartHandler(BaseHandler):
             "start",
             "começar",
         ):
-            await self.message_gateway.send_text(
-                session.phone,
-                f"Olá! Eu sou a {bot_name}, atendente virtual da {broker_name}. Antes de começarmos, qual o seu nome?",
-            )
+            welcome_first = humanizer.get_welcome_first_time_phrase(bot_name, broker_name)
+            await self.message_gateway.send_text(session.phone, welcome_first)
             return False
 
         # Caso contrário, assume que o texto é o nome do cliente
         session.client_name = text.strip().title()
         session.transition_to(ConversationStep.INTENT)
-        await self.message_gateway.send_text(session.phone, f"Prazer, {session.client_name}!")
+        conf_msg = humanizer.get_welcome_name_confirmation_phrase(session.client_name)
+        await self.message_gateway.send_text(session.phone, conf_msg)
         await self.message_gateway.send_text(
             session.phone, "Você está buscando um imóvel para **Locação** ou **Venda**?"
         )
         return False
+

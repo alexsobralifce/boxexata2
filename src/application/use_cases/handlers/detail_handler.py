@@ -3,6 +3,7 @@ from src.domain.entities.session import Session, ConversationStep
 from src.domain.repositories.i_message_gateway import IMessageGateway
 from src.domain.repositories.i_property_repository import IPropertyRepository
 from src.application.services.property_presenter import send_property_cards
+from src.application.services import humanizer
 from src.shared.config import settings
 
 
@@ -63,11 +64,18 @@ class DetailHandler(BaseHandler):
             return False
 
         # Qualquer outra mensagem envia os dados de contato / agendamento
-        await self.message_gateway.send_text(
-            session.phone,
-            "Para agendar uma visita ou falar com um corretor, clique no link abaixo:\n"
-            "https://wa.me/558836113000\n"
-            "Ou ligue para o telefone fixo: (88) 3611-3000.\n\n"
-            "Digite 'voltar' para retornar à lista de imóveis ou 'reiniciar' para fazer uma nova busca.",
-        )
+        ref = ""
+        if session.selected_property_id:
+            try:
+                listing = await self.property_repo.find_by_id(session.selected_property_id)
+                if listing:
+                    ref = listing.ref
+            except Exception:
+                pass
+
+        booking_msg = humanizer.get_booking_phrase(ref)
+        footer = humanizer.get_solicitude_footer()
+        full_msg = f"{booking_msg}\n\n{footer}"
+        await self.message_gateway.send_text(session.phone, full_msg)
         return False
+

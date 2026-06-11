@@ -7,6 +7,7 @@ from src.domain.repositories.i_subscription_store import ISubscriptionStore
 from src.shared.config import settings
 from src.shared.logger import logger
 from src.application.services.property_presenter import send_property_cards
+from src.application.services import humanizer
 
 
 class ShowingHandler(BaseHandler):
@@ -63,20 +64,10 @@ class ShowingHandler(BaseHandler):
             )
             await self.subscription_store.save(subscription)
 
-            price_info = (
-                f" até *R$ {session.max_value:,.2f}*".replace(",", "X")
-                .replace(".", ",")
-                .replace("X", ".")
-                if session.max_value
-                else ""
+            alert_msg = humanizer.get_alert_activated_phrase(
+                session.client_name, session.property_type, session.neighborhood, session.intent, session.max_value
             )
-            await self.message_gateway.send_text(
-                session.phone,
-                f"Perfeito, {session.client_name or 'amigo(a)'}! Assinatura de alertas ativada. Vou te avisar "
-                f"assim que surgirem novos imóveis do tipo *{session.property_type}* no bairro *{session.neighborhood}* "
-                f"para *{session.intent}*{price_info}.\n\n"
-                "Para cancelar os alertas a qualquer momento, basta digitar 'desativar alerta'.",
-            )
+            await self.message_gateway.send_text(session.phone, alert_msg)
             return False
 
         # Comando "desativar alerta" / "cancelar alerta" / "remover alerta"
@@ -89,18 +80,15 @@ class ShowingHandler(BaseHandler):
             "remover alertas",
         ):
             await self.subscription_store.delete(session.phone)
-            await self.message_gateway.send_text(
-                session.phone,
-                "Seus alertas de novos imóveis foram cancelados com sucesso. "
-                "Se precisar de novos alertas no futuro, basta realizar uma busca e digitar 'alertar'.",
-            )
+            cancel_msg = humanizer.get_alert_cancelled_phrase()
+            await self.message_gateway.send_text(session.phone, cancel_msg)
             return False
 
         # Se houver 0 resultados na busca, os únicos comandos permitidos além de alertar/desativar são reiniciar
         if len(session.results) == 0:
             await self.message_gateway.send_text(
                 session.phone,
-                "Não há imóveis disponíveis com este perfil para exibição. Digite 'alertar' para assinar alertas ou 'reiniciar' para tentar com outros critérios.",
+                "Não há imóveis disponíveis com este perfil para mostrar agora. 😔 Mas você pode digitar **alertar** para assinar alertas desse perfil, ou **reiniciar** para tentar com outros critérios!",
             )
             return False
 
@@ -136,10 +124,8 @@ class ShowingHandler(BaseHandler):
                 )
                 await self.message_gateway.send_text(session.phone, footer_msg)
             else:
-                await self.message_gateway.send_text(
-                    session.phone,
-                    "Não encontrei mais imóveis com essas preferências no site. 😔 Digite 'reiniciar' para fazer uma nova busca. 🔄",
-                )
+                no_more_msg = humanizer.get_no_more_results_phrase()
+                await self.message_gateway.send_text(session.phone, no_more_msg)
             return False
 
         # Tenta interpretar como seleção numérica de imóvel
@@ -157,7 +143,7 @@ class ShowingHandler(BaseHandler):
                     if not listing:
                         await self.message_gateway.send_text(
                             session.phone,
-                            "Desculpe, não consegui carregar os detalhes desse imóvel no momento. Digite 'voltar' para tentar novamente.",
+                            "Desculpe, não consegui carregar os detalhes desse imóvel no momento. 😅 Digite 'voltar' para tentar novamente.",
                         )
                         return False
 
@@ -193,19 +179,20 @@ class ShowingHandler(BaseHandler):
                             detail_lines.append(f"- {feat}")
 
                     detail_lines.append(f"\nLink no site: {listing.url}")
-                    detail_lines.append(
-                        "\nSe quiser agendar uma visita para este imóvel, clique no link abaixo para falar com um de nossos corretores:\n"
-                        f"https://wa.me/558836113000?text=Olá,%20gostaria%20de%20agendar%20uma%20visita%20para%20o%20imóvel%20Ref%20{listing.ref}"
-                        "\n\nDigite 'voltar' para ver a lista de imóveis novamente, ou 'reiniciar' para fazer uma nova busca."
+                    
+                    booking_part = (
+                        "\nCom certeza posso te ajudar com isso! 😊 Clique no link abaixo para falar direto com um de nossos corretores no WhatsApp. Eles vão adorar te atender!\n\n"
+                        f"https://wa.me/558836113000?text=Olá,%20gostaria%20de%20agendar%20uma%20visita%20para%20o%20imóvel%20Ref%20{listing.ref}\n\n"
+                        "Digite 'voltar' para ver a lista de imóveis novamente, ou 'reiniciar' para fazer uma nova busca."
                     )
+                    detail_lines.append(booking_part)
 
                     await self.message_gateway.send_text(session.phone, "\n".join(detail_lines))
                     return False
             except (ValueError, IndexError):
                 pass
 
-        await self.message_gateway.send_text(
-            session.phone,
-            "Não entendi. Por favor, digite o número do imóvel desejado (ex: 1, 2, 3), 'mais' para ver mais opções, 'alertar' para receber alertas de novos imóveis, ou 'reiniciar' para começar uma nova busca.",
-        )
+        unknown_msg = humanizer.get_unknown_command_phrase()
+        await self.message_gateway.send_text(session.phone, unknown_msg)
         return False
+

@@ -4,6 +4,7 @@ from src.domain.repositories.i_message_gateway import IMessageGateway
 from src.domain.repositories.i_property_repository import IPropertyRepository
 from src.application.services.i_preference_extractor import IPreferenceExtractor
 from src.application.services.property_presenter import send_property_cards
+from src.application.services import humanizer
 from src.shared.logger import logger
 
 
@@ -49,31 +50,20 @@ class PreferencesHandler(BaseHandler):
         )
 
         try:
+            thinking_msg = humanizer.get_thinking_phrase(session.client_name)
+            await self.message_gateway.send_text(session.phone, thinking_msg)
             await self.message_gateway.send_typing(session.phone, duration_ms=2000)
             results = await self.property_repo.find_by_preferences(session)
         except Exception as e:
             logger.error("Erro ao buscar imóveis no repositório", error=str(e))
-            await self.message_gateway.send_text(
-                session.phone,
-                "Desculpe, tive um problema ao pesquisar no site da Exata Serviços no momento. 😔 Por favor, tente novamente em alguns instantes.",
-            )
+            err_msg = humanizer.get_error_phrase()
+            await self.message_gateway.send_text(session.phone, err_msg)
             return False
 
         if not results:
-            intent_label = "alugar" if session.intent == "Locação" else "comprar"
-            valor_label = (
-                f" com valor até R$ {session.max_value:,.2f}".replace(",", "X")
-                .replace(".", ",")
-                .replace("X", ".")
-                if session.max_value
-                else ""
-            )
             location_label = f"no bairro {session.neighborhood}" if session.neighborhood else f"próximo a {session.reference_point}"
-            msg = (
-                f"Não encontrei nenhuma opção de {session.property_type.lower()} para {intent_label} "
-                f"{location_label}{valor_label} no momento. 😔\n\n"
-                "Quer que eu te avise assim que novos imóveis com esse perfil surgirem no site? Digite **alertar** para ativar. 🔔\n"
-                "Se preferir fazer uma nova busca com outros critérios, digite **começar**."
+            msg = humanizer.get_not_found_phrase(
+                session.client_name, session.property_type, location_label, session.max_value
             )
             session.results = []
             session.result_offset = 0
@@ -98,9 +88,10 @@ class PreferencesHandler(BaseHandler):
         page_size = 3
         slice_results = results_dicts[:page_size]
 
+        success_msg = humanizer.get_search_success_phrase(session.client_name)
         await self.message_gateway.send_text(
             session.phone,
-            "Encontrei esses imóveis que encaixam nas suas preferências! 🏡✨👇"
+            success_msg
         )
 
         # Envia os cartões (imagem + texto detalhado)
@@ -121,3 +112,4 @@ class PreferencesHandler(BaseHandler):
         )
         await self.message_gateway.send_text(session.phone, footer_msg)
         return False
+
