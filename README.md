@@ -142,7 +142,8 @@ pytest tests/ -v
    │  - Digite "mais" para ver outros ou o número (ex: "1") para detalhes completos.
    │
    ├──► [Cliente] "1" ──► Ana envia fotos, taxas adicionais, características e link para agendamento.
-   └──► [Cliente] "mais" ──► Ana pagina os resultados mostrando as próximas 3 opções.
+   ├──► [Cliente] "mais" ──► Ana pagina os resultados mostrando as próximas 3 opções.
+   └──► [Cliente] "alertar" ──► Ana ativa os alertas, avisa o cliente e pergunta se deseja continuar (1) ou encerrar (2).
 ```
 
 ---

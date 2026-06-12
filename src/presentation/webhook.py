@@ -188,6 +188,23 @@ async def _process_webhook_message(instance_id: str, phone: str, text: str) -> N
     broker_repo = cont["broker_repo"]
     broker_profile = await broker_repo.get_by_instance(instance_id)
 
+    # Se o banco de dados estiver configurado, exigimos que o broker esteja cadastrado e ativo
+    if settings.database_url:
+        if not broker_profile:
+            logger.warning(
+                "Webhook ignorado: Instancia nao cadastrada na gestao de corretores",
+                instance_id=instance_id,
+                phone=phone,
+            )
+            return
+        if not broker_profile.is_active:
+            logger.warning(
+                "Webhook ignorado: Instancia inativa na gestao de corretores",
+                instance_id=instance_id,
+                phone=phone,
+            )
+            return
+
     from src.shared.context import set_current_broker, current_broker
 
     tok = set_current_broker(broker_profile)

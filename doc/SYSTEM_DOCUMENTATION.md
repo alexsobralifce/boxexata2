@@ -131,7 +131,8 @@ botexata/
 │   │   │       ├── intent_handler.py
 │   │   │       ├── preferences_handler.py
 │   │   │       ├── showing_handler.py
-│   │   │       └── detail_handler.py
+│   │   │       ├── detail_handler.py
+│   │   │       └── farewell_handler.py
 │   │   └── services/
 │   │       ├── i_preference_extractor.py
 │   │       ├── regex_extractor.py
@@ -216,7 +217,7 @@ Representa a **sessão de conversa** de um cliente. É o objeto central da máqu
 **Enum `ConversationStep`:**
 
 ```
-START → INTENT → PREFERENCES → SEARCHING → SHOWING → DETAIL
+START → INTENT → PREFERENCES → SEARCHING → SHOWING → DETAIL → FAREWELL
 ```
 
 | Step | Descrição |
@@ -227,6 +228,7 @@ START → INTENT → PREFERENCES → SEARCHING → SHOWING → DETAIL
 | `SEARCHING` | Estado intermediário (busca em progresso) |
 | `SHOWING` | Exibe resultados, navega, ativa alertas |
 | `DETAIL` | Exibe detalhes do imóvel selecionado |
+| `FAREWELL` | Fluxo de encerramento após ativação de alerta (pergunta se quer continuar) |
 
 **Métodos importantes:**
 - `update_preferences(**kwargs)` — atualiza campos coletados sem sobrescrever com `None`
@@ -410,6 +412,13 @@ Handler mais complexo. Interpreta comandos na etapa de exibição:
 - `"reiniciar"` → reseta tudo
 - Qualquer outra coisa → lembra comandos disponíveis
 
+#### `FarewellHandler` — `farewell_handler.py`
+
+- Ativado após o cliente criar um alerta no estado `SHOWING`.
+- Pergunta ao cliente se deseja continuar o atendimento ou encerrar (1-Sim, 2-Não).
+- `"1"` ou `"sim"` → Reinicia a conversa (vai para `INTENT`).
+- `"2"` ou `"não"` → Agradece, se despede e reseta a sessão (volta para `START`).
+
 ---
 
 ### 5.3 Serviços de Aplicação
@@ -485,6 +494,8 @@ Implementação de `IPropertyRepository` que realiza scraping do site **exataser
 **Encoding:** O site usa `iso-8859-1`. O scraper detecta e converte automaticamente.
 
 **`RateLimiter`**: Garante intervalo mínimo de 1 segundo entre requisições HTTP (asyncio Lock).
+
+**Sincronização Standalone:** O script `scripts/sync_properties.py` permite executar a varredura do site localmente através da CLI para popular ou forçar a atualização do cache (ideal para agendadores externos).
 
 **Multi-tenant:** A URL base é lida dinamicamente de `get_current_broker().site_base_url` (via `ContextVar`), com fallback para `settings.site_base_url`.
 
