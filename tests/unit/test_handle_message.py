@@ -108,13 +108,19 @@ async def test_full_dialog_flow(test_setup: Any) -> None:
     assert session.step == ConversationStep.PREFERENCES
     assert "tipo" in gateway.sent_texts[-1]["text"].lower()
 
-    # Step 4: Enviar preferências e exibir resultados
+    # Step 4: Enviar preferências → bot exibe confirmação de critérios
     await use_case.execute(phone, "casa no centro ate 1500", bypass_hours=True)
     session = await session_store.get_or_create(phone)
-    assert session.step == ConversationStep.SHOWING
+    assert session.step == ConversationStep.CONFIRM_CRITERIA
     assert session.property_type == "Casa"
     assert session.neighborhood == "Centro"
     assert session.max_value == 1500.0
+    assert "confirmando sua busca" in gateway.sent_texts[-1]["text"].lower()
+
+    # Step 4b: Cliente confirma os critérios → bot busca e exibe resultados
+    await use_case.execute(phone, "sim", bypass_hours=True)
+    session = await session_store.get_or_create(phone)
+    assert session.step == ConversationStep.SHOWING
     assert len(session.results) == 1
     assert any("REF101" in msg["text"] for msg in gateway.sent_texts)
     assert len(gateway.sent_images) == 1
@@ -194,6 +200,7 @@ async def test_preferences_handler_no_results(test_setup: Any) -> None:
     session.neighborhood = "Derby"
     session.max_value = 500.0  # Nenhuma casa no Derby por R$ 500
     session.step = ConversationStep.PREFERENCES
+    session._confirmed_search = True  # type: ignore[attr-defined]  # pula etapa de confirmação
     await session_store.save(session)
 
     await use_case.execute(phone, "buscar", bypass_hours=True)
@@ -219,6 +226,7 @@ async def test_preferences_handler_error(test_setup: Any) -> None:
     session.property_type = "Casa"
     session.neighborhood = "Centro"
     session.step = ConversationStep.PREFERENCES
+    session._confirmed_search = True  # type: ignore[attr-defined]  # pula etapa de confirmação
     await session_store.save(session)
 
     await use_case.execute(phone, "buscar", bypass_hours=True)
