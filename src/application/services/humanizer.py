@@ -215,3 +215,47 @@ def get_booking_phrase(ref: str = "") -> str:
         f"Digite 'voltar' para retornar à lista de imóveis ou 'reiniciar' para fazer uma nova busca."
     ]
     return random.choice(variations)
+
+def get_farewell_question_phrase(client_name: str | None = None) -> str:
+    """Pergunta profissional e amigável se o cliente precisa de mais ajuda, após criar um alerta."""
+    nome = f", {client_name}" if client_name else ""
+    variations = [
+        f"Posso te ajudar com mais alguma coisa{nome}? 😊\n\n"
+        "*1️⃣ - Sim*, quero continuar\n"
+        "*2️⃣ - Não*, pode encerrar",
+
+        f"Fico feliz em ter ajudado{nome}! 🎉 Tem mais alguma coisa em que eu possa te ajudar?\n\n"
+        "*1️⃣ - Sim*, quero continuar\n"
+        "*2️⃣ - Não*, pode encerrar",
+
+        f"Tudo certo{nome}! 👍 Posso fazer mais alguma coisa por você?\n\n"
+        "*1️⃣ - Sim*, quero continuar\n"
+        "*2️⃣ - Não*, pode encerrar",
+    ]
+    return random.choice(variations)
+
+
+def get_farewell_goodbye_phrase(client_name: str | None = None) -> str:
+    """Mensagem de despedida calorosa ao encerrar o atendimento."""
+    nome = f", {client_name}" if client_name else ""
+    variations = [
+        f"Foi um prazer te atender{nome}! 😊🏡\n"
+        "Estarei sempre aqui caso precise de algo. Até logo e boas buscas! 🌟",
+
+        f"Obrigada pela preferência{nome}! 🏡✨\n"
+        "Se precisar de qualquer coisa, é só chamar. Até a próxima! 😊",
+
+        f"Fico feliz em ter ajudado{nome}! 😊\n"
+        "Qualquer dúvida ou nova busca, estarei aqui. Até logo! 👋",
+    ]
+    return random.choice(variations)
+
+
+def get_farewell_invalid_option_phrase() -> str:
+    """Mensagem quando o cliente digita algo fora de 1 ou 2 no estado FAREWELL."""
+    variations = [
+        "Por favor, escolha uma das opções:\n\n*1️⃣ - Sim*, quero continuar\n*2️⃣ - Não*, pode encerrar",
+        "Não entendi. 😅 Responda apenas:\n\n*1* para continuar\n*2* para encerrar",
+    ]
+    return random.choice(variations)
+

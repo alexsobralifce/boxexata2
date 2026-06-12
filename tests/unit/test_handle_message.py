@@ -315,8 +315,18 @@ async def test_showing_handler_alertar(test_setup: Any) -> None:
 
     await use_case.execute(phone, "alertar", bypass_hours=True)
 
-    # Verifica se enviou mensagem de sucesso
-    assert "assinatura de alertas ativada" in gateway.sent_texts[-1]["text"].lower()
+    # A penúltima mensagem deve ser a confirmação do alerta
+    assert "assinatura de alertas ativada" in gateway.sent_texts[-2]["text"].lower()
+
+    # A última mensagem deve ser a pergunta de encerramento (FAREWELL)
+    assert any(
+        keyword in gateway.sent_texts[-1]["text"].lower()
+        for keyword in ("posso te ajudar", "ajudar com mais", "fico feliz em ter ajudado", "tudo certo")
+    )
+
+    # O estado deve ter transitado para FAREWELL
+    session = await session_store.get_or_create(phone)
+    assert session.step == ConversationStep.FAREWELL
 
     # Verifica se salvou a assinatura no store
     sub = await use_case._subscription_store.get(phone)

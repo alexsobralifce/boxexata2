@@ -14,6 +14,7 @@ class ConversationStep(Enum):
     FAQ = auto()              # Dúvidas financeiras/documentais
     OWNER_ONBOARDING = auto() # Proprietário que quer anunciar imóvel
     HANDOFF = auto()          # Transferência para corretor humano
+    FAREWELL = auto()         # Encerramento após alerta — "posso ajudar em mais algo?"
 
 
 class Session:

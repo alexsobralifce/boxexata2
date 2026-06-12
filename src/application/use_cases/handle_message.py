@@ -15,6 +15,7 @@ from src.application.use_cases.handlers.preferences_handler import PreferencesHa
 from src.application.use_cases.handlers.confirm_criteria_handler import ConfirmCriteriaHandler
 from src.application.use_cases.handlers.showing_handler import ShowingHandler
 from src.application.use_cases.handlers.detail_handler import DetailHandler
+from src.application.use_cases.handlers.farewell_handler import FarewellHandler
 from src.shared.config import settings
 from src.shared.logger import logger
 
@@ -47,6 +48,7 @@ class HandleMessageUseCase:
                 property_repo, message_gateway, subscription_store
             ),
             ConversationStep.DETAIL: DetailHandler(message_gateway, property_repo),
+            ConversationStep.FAREWELL: FarewellHandler(message_gateway),
         }
 
     def _is_within_business_hours(self) -> bool:

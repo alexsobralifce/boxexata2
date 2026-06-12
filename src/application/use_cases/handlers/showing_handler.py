@@ -68,6 +68,11 @@ class ShowingHandler(BaseHandler):
                 session.client_name, session.property_type, session.neighborhood, session.intent, session.max_value
             )
             await self.message_gateway.send_text(session.phone, alert_msg)
+
+            # Pergunta se o cliente deseja continuar ou encerrar o atendimento
+            farewell_question = humanizer.get_farewell_question_phrase(session.client_name)
+            await self.message_gateway.send_text(session.phone, farewell_question)
+            session.transition_to(ConversationStep.FAREWELL)
             return False
 
         # Comando "desativar alerta" / "cancelar alerta" / "remover alerta"
