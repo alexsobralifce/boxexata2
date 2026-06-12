@@ -53,6 +53,9 @@ class Session:
         owner_value: Optional[str] = None,
         owner_availability: Optional[str] = None,
         owner_step: int = 0,  # 0=tipo, 1=endereço, 2=valor, 3=disponibilidade
+        # --- Campos de confirmação (Fase 1+) ---
+        confirm_shown: bool = False,
+        confirmed_search: bool = False,
     ) -> None:
         self.phone = phone
         self.step = step
@@ -85,6 +88,9 @@ class Session:
         self.owner_value = owner_value
         self.owner_availability = owner_availability
         self.owner_step = owner_step
+        # Confirmação
+        self.confirm_shown = confirm_shown
+        self.confirmed_search = confirmed_search
 
     def update_preferences(
         self,
@@ -153,4 +159,6 @@ class Session:
         self.persona = None
         self.lead_score = 0
         self.handoff_reason = None
+        self.confirm_shown = False
+        self.confirmed_search = False
         self.step = ConversationStep.START

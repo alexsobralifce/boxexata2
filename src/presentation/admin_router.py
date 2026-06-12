@@ -232,8 +232,8 @@ async def list_properties(
     if property_repo.engine:
         async with AsyncSession(property_repo.engine) as session:
             statement = select(Properties).limit(1)
-            result = await session.execute(statement)
-            if not result.scalars().first():
+            db_result = await session.execute(statement)
+            if not db_result.scalars().first():
                 # Dispara a busca geral para criar os registros iniciais no banco
                 logger.info("Carga inicial de imóveis executada (banco de dados vazio)")
                 await property_repo._scrape_all_basic_listings()

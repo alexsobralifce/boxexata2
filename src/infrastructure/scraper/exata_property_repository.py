@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup
 import httpx
 import re
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlmodel import select
+from sqlmodel import select, col
 from src.infrastructure.persistence.models import Properties
 
 from src.domain.entities.property_listing import PropertyListing
@@ -314,27 +314,27 @@ class ExataPropertyRepository(IPropertyRepository):
         async with AsyncSession(self.engine) as session:
             statement = select(Properties)
             if property_type:
-                statement = statement.where(Properties.property_type.ilike(f"%{property_type}%"))
+                statement = statement.where(col(Properties.property_type).ilike(f"%{property_type}%"))
             if bedrooms is not None:
-                statement = statement.where(Properties.bedrooms >= bedrooms)
+                statement = statement.where(col(Properties.bedrooms) >= bedrooms)
             if bathrooms is not None:
-                statement = statement.where(Properties.bathrooms >= bathrooms)
+                statement = statement.where(col(Properties.bathrooms) >= bathrooms)
             if parking_spaces is not None:
-                statement = statement.where(Properties.parking_spaces >= parking_spaces)
+                statement = statement.where(col(Properties.parking_spaces) >= parking_spaces)
             if min_price is not None:
-                statement = statement.where(Properties.value >= min_price)
+                statement = statement.where(col(Properties.value) >= min_price)
             if max_price is not None:
-                statement = statement.where(Properties.value <= max_price)
+                statement = statement.where(col(Properties.value) <= max_price)
             if neighborhood:
-                statement = statement.where(Properties.neighborhood.ilike(f"%{neighborhood}%"))
+                statement = statement.where(col(Properties.neighborhood).ilike(f"%{neighborhood}%"))
             if intent:
-                statement = statement.where(Properties.intent.ilike(f"%{intent}%"))
+                statement = statement.where(col(Properties.intent).ilike(f"%{intent}%"))
             if ref:
-                statement = statement.where(Properties.ref.ilike(f"%{ref}%"))
+                statement = statement.where(col(Properties.ref).ilike(f"%{ref}%"))
             if is_available is not None:
-                statement = statement.where(Properties.is_available == is_available)
+                statement = statement.where(col(Properties.is_available) == is_available)
 
-            statement = statement.order_by(Properties.created_at.desc())
+            statement = statement.order_by(col(Properties.created_at).desc())
             result = await session.execute(statement)
             models = result.scalars().all()
             return [m.to_entity() for m in models]

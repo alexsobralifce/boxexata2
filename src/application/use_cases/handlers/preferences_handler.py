@@ -42,13 +42,13 @@ class PreferencesHandler(BaseHandler):
             return False
 
         # Critérios mínimos preenchidos → redireciona para confirmação antes de buscar
-        # A flag _confirmed_search é setada pelo ConfirmCriteriaHandler após aprovação
-        if not getattr(session, "_confirmed_search", False):
+        # A flag confirmed_search é setada pelo ConfirmCriteriaHandler após aprovação
+        if not session.confirmed_search:
             session.transition_to(ConversationStep.CONFIRM_CRITERIA)
             return True  # ConfirmCriteriaHandler vai exibir o resumo
 
-        # Se chegou aqui com _confirmed_search=True, reseta a flag e executa a busca
-        session._confirmed_search = False  # type: ignore[attr-defined]
+        # Se chegou aqui com confirmed_search=True, reseta a flag e executa a busca
+        session.confirmed_search = False
 
         # Se temos as preferências confirmadas, realiza a busca
 

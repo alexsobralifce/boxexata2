@@ -56,6 +56,8 @@ class RedisSessionStore(ISessionStore):
                     owner_value=data.get("owner_value"),
                     owner_availability=data.get("owner_availability"),
                     owner_step=data.get("owner_step", 0),
+                    confirm_shown=data.get("confirm_shown", False),
+                    confirmed_search=data.get("confirmed_search", False),
                 )
         except Exception as e:
             logger.error("Erro ao buscar sessão no RedisSessionStore", phone=phone, error=str(e))
@@ -97,6 +99,8 @@ class RedisSessionStore(ISessionStore):
                 "owner_value": session.owner_value,
                 "owner_availability": session.owner_availability,
                 "owner_step": session.owner_step,
+                "confirm_shown": session.confirm_shown,
+                "confirmed_search": session.confirmed_search,
             }
             serialized = json.dumps(data)
             await self.client.set(key, serialized, ex=self.ttl)

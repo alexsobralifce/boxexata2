@@ -200,7 +200,7 @@ async def test_preferences_handler_no_results(test_setup: Any) -> None:
     session.neighborhood = "Derby"
     session.max_value = 500.0  # Nenhuma casa no Derby por R$ 500
     session.step = ConversationStep.PREFERENCES
-    session._confirmed_search = True  # type: ignore[attr-defined]  # pula etapa de confirmação
+    session.confirmed_search = True  # pula etapa de confirmação
     await session_store.save(session)
 
     await use_case.execute(phone, "buscar", bypass_hours=True)
@@ -226,7 +226,7 @@ async def test_preferences_handler_error(test_setup: Any) -> None:
     session.property_type = "Casa"
     session.neighborhood = "Centro"
     session.step = ConversationStep.PREFERENCES
-    session._confirmed_search = True  # type: ignore[attr-defined]  # pula etapa de confirmação
+    session.confirmed_search = True  # pula etapa de confirmação
     await session_store.save(session)
 
     await use_case.execute(phone, "buscar", bypass_hours=True)

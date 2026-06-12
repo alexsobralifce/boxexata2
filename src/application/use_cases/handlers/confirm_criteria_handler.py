@@ -65,8 +65,8 @@ class ConfirmCriteriaHandler(BaseHandler):
         clean_text = text.lower().strip()
 
         # Primeira vez nessa etapa: exibe resumo e aguarda resposta
-        if not hasattr(session, "_confirm_shown") or not session._confirm_shown:  # type: ignore[attr-defined]
-            session._confirm_shown = True  # type: ignore[attr-defined]
+        if not session.confirm_shown:
+            session.confirm_shown = True
             summary = _build_criteria_summary(session)
             await self.message_gateway.send_text(session.phone, summary)
             return False
@@ -74,7 +74,7 @@ class ConfirmCriteriaHandler(BaseHandler):
         # Cliente confirmou → avança para busca
         if clean_text in ("sim", "s", "isso", "correto", "certo", "ok", "pode", "pode buscar", "pode pesquisar", "confirmar", "confirmo"):
             logger.info("Cliente confirmou critérios de busca", phone=session.phone)
-            session._confirmed_search = True  # type: ignore[attr-defined]
+            session.confirmed_search = True
             session.transition_to(ConversationStep.PREFERENCES)
             return True  # Dispara a transição para PreferencesHandler buscar
 
@@ -86,7 +86,7 @@ class ConfirmCriteriaHandler(BaseHandler):
                 "Tudo bem! Vamos ajustar. O que você gostaria de mudar? Pode me dizer o tipo, bairro, valor ou qualquer outra preferência. 😊",
             )
             # Reseta o flag de exibição para quando retornar
-            session._confirm_shown = False  # type: ignore[attr-defined]
+            session.confirm_shown = False
             return False
 
         # Resposta não reconhecida
