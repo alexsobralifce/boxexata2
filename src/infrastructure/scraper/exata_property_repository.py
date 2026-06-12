@@ -61,9 +61,15 @@ class ExataPropertyRepository(IPropertyRepository):
         from src.shared.context import get_current_broker
 
         broker = get_current_broker()
+        url = settings.site_base_url
         if broker and broker.site_base_url:
-            return broker.site_base_url
-        return settings.site_base_url
+            url = broker.site_base_url
+
+        # Normalização para garantir que a URL seja apenas o host/domínio puro
+        url = url.rstrip("/")
+        if "/imovel.php" in url:
+            url = url.split("/imovel.php")[0]
+        return url.rstrip("/")
 
     def _map_property_type_to_code(self, property_type: Optional[str]) -> Optional[int]:
         """Mapeia a string descritiva do tipo de imóvel para o código interno do site."""
