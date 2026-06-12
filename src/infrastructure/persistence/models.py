@@ -106,7 +106,9 @@ class Properties(SQLModel, table=True):
     photos: str = Field(default="[]")  # Armazenado como string JSON
     intent: Optional[str] = Field(default=None, nullable=True)
     is_available: bool = Field(default=True, index=True)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None), index=True)
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None), index=True
+    )
 
     @classmethod
     def from_entity(cls, entity: PropertyListing) -> "Properties":

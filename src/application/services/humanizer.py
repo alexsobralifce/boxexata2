@@ -4,6 +4,7 @@ import random
 # Brasília timezone (UTC-3), Sobral CE does not have Daylight Saving Time
 BRASILIA_TZ = timezone(timedelta(hours=-3))
 
+
 def get_greeting() -> str:
     """Retorna 'Bom dia', 'Boa tarde' ou 'Boa noite' com emoji baseado na hora atual (UTC-3)."""
     # 05–11h → Bom dia ☀️
@@ -17,6 +18,7 @@ def get_greeting() -> str:
         return "🌤️ Boa tarde"
     else:
         return "🌙 Boa noite"
+
 
 def get_welcome_first_time_phrase(bot_name: str, broker_name: str) -> str:
     """Frase aleatória para o primeiro contato/boas-vindas solicitando o nome."""
@@ -41,6 +43,7 @@ def get_welcome_returning_phrase(client_name: str | None, bot_name: str, broker_
     ]
     return random.choice(variations)
 
+
 def get_welcome_name_confirmation_phrase(client_name: str | None) -> str:
     """Confirmação do nome do cliente."""
     nome = client_name or "amigo(a)"
@@ -50,6 +53,7 @@ def get_welcome_name_confirmation_phrase(client_name: str | None) -> str:
         f"Muito prazer, {nome}! Fico feliz em falar com você. 😊",
     ]
     return random.choice(variations)
+
 
 def get_intent_recognized_phrase(client_name: str | None, intent: str) -> str:
     """Confirmação da intenção (Locação/Venda)."""
@@ -62,6 +66,7 @@ def get_intent_recognized_phrase(client_name: str | None, intent: str) -> str:
     ]
     return random.choice(variations)
 
+
 def get_intent_invalid_phrase(client_name: str | None) -> str:
     """Mensagem de erro para intent inválido."""
     nome = client_name or "amigo(a)"
@@ -71,6 +76,7 @@ def get_intent_invalid_phrase(client_name: str | None) -> str:
         f"Poderia me confirmar, {nome}? Você quer **Locação** (aluguel) ou **Venda** (compra)? Digite uma das opções!",
     ]
     return random.choice(variations)
+
 
 def get_thinking_phrase(client_name: str | None = None) -> str:
     """Frase aleatória de espera e processamento."""
@@ -83,6 +89,7 @@ def get_thinking_phrase(client_name: str | None = None) -> str:
     ]
     return random.choice(variations)
 
+
 def get_search_success_phrase(client_name: str | None = None) -> str:
     """Frase aleatória de sucesso na busca."""
     nome = f", {client_name}" if client_name else ""
@@ -94,31 +101,33 @@ def get_search_success_phrase(client_name: str | None = None) -> str:
     ]
     return random.choice(variations)
 
-def get_not_found_phrase(client_name: str | None, property_type: str, location: str, max_value: float | None = None) -> str:
+
+def get_not_found_phrase(
+    client_name: str | None, property_type: str, location: str, max_value: float | None = None
+) -> str:
     """Mensagem empática quando nenhum imóvel é encontrado."""
     nome = client_name or "amigo(a)"
     tipo = property_type.lower() if property_type else "imóvel"
     loc = f" {location}" if location else ""
-    
+
     val_info = ""
     if max_value:
         price_fmt = f"R$ {max_value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
         val_info = f" com valor até {price_fmt}"
-        
+
     variations = [
         f"Não encontrei nenhuma opção de {tipo} para {loc}{val_info} no momento. 😔\n\n"
         f"Quer que eu te avise assim que novos imóveis com esse perfil surgirem no site? Digite **alertar** para ativar. 🔔\n"
         f"Se preferir fazer uma nova busca com outros critérios, digite **começar**.",
-        
         f"Poxa, {nome}, não encontrei nada de {tipo} {loc}{val_info} no momento. 😔\n\n"
         f"Mas não desanime! Posso te avisar assim que novos imóveis com esse perfil surgirem no site. Digite **alertar** para ativar. 🔔\n"
         f"Se preferir tentar com outros critérios, digite **começar**! 😊",
-        
         f"Hum, {nome}... No momento não temos nenhuma opção de {tipo} disponível para {loc}{val_info}. 😔\n\n"
         f"Deseja assinar nossos alertas para ser avisado(a) assim que entrar algo? Digite **alertar**! 🔔\n"
         f"Se quiser tentar uma busca diferente, basta digitar **começar**. 😉",
     ]
     return random.choice(variations)
+
 
 def get_error_phrase() -> str:
     """Frase de erro técnico amigável e empática."""
@@ -128,6 +137,7 @@ def get_error_phrase() -> str:
         "Ops! Parece que deu um erro do meu lado. 😓 Pode tentar de novo? Se persistir, já já eu volto ao normal!",
     ]
     return random.choice(variations)
+
 
 def get_solicitude_footer() -> str:
     """Footer solícito para o final de interações importantes."""
@@ -139,26 +149,30 @@ def get_solicitude_footer() -> str:
     ]
     return random.choice(variations)
 
+
 def get_alert_activated_phrase(
-    client_name: str | None, property_type: str, neighborhood: str, intent: str, max_value: float | None = None
+    client_name: str | None,
+    property_type: str,
+    neighborhood: str,
+    intent: str,
+    max_value: float | None = None,
 ) -> str:
     """Mensagem de alerta ativado com entusiasmo."""
     nome = client_name or "amigo(a)"
     tipo = property_type or "imóvel"
     bairro = neighborhood or "Região selecionada"
     intent_lbl = "Locação" if "loca" in intent.lower() or "alug" in intent.lower() else "Venda"
-    
+
     val_info = ""
     if max_value:
         price_fmt = f"R$ {max_value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
         val_info = f" até *{price_fmt}*"
-        
+
     variations = [
         f"Perfeito, {nome}! ✅ Assinatura de alertas ativada. Vou te avisar "
         f"assim que surgirem novos imóveis do tipo *{tipo}* no bairro *{bairro}* "
         f"para *{intent_lbl}*{val_info}.\n\n"
         f"Para cancelar os alertas a qualquer momento, basta digitar 'desativar alerta'.",
-        
         f"Tudo certo, {nome}! ✅ Cadastrei seu alerta com sucesso. "
         f"Vou ficar de olho! Quando entrar um(a) *{tipo}* no bairro *{bairro}* "
         f"para *{intent_lbl}*{val_info}, eu venho correndo te avisar! 🔔😊\n\n"
@@ -166,28 +180,28 @@ def get_alert_activated_phrase(
     ]
     return random.choice(variations)
 
+
 def get_alert_cancelled_phrase() -> str:
     """Mensagem de alerta cancelado com gentileza."""
     variations = [
         "Seus alertas de novos imóveis foram cancelados com sucesso. "
         "Se precisar de novos alertas no futuro, basta realizar uma busca e digitar 'alertar'.",
-        
         "Tudo bem! Seus alertas foram cancelados com sucesso. 😊 "
         "Se precisar de mim novamente, estarei aqui!",
-        
         "Alertas desativados com sucesso! Se mudar de ideia ou quiser buscar outras opções, estarei aqui à sua disposição. ✨",
     ]
     return random.choice(variations)
+
 
 def get_unknown_command_phrase() -> str:
     """Mensagem de comando não reconhecido amigável."""
     variations = [
         "Não entendi. Por favor, digite o número do imóvel desejado (ex: 1, 2, 3), "
         "'mais' para ver mais opções, 'alertar' para receber alertas de novos imóveis, ou 'reiniciar' para começar uma nova busca.",
-        
         "Hmm, não entendi direito. 😅 Você pode digitar o número do imóvel, 'mais', 'alertar' ou 'reiniciar'!",
     ]
     return random.choice(variations)
+
 
 def get_no_more_results_phrase() -> str:
     """Mensagem de nenhum resultado adicional mais humanizada."""
@@ -198,23 +212,24 @@ def get_no_more_results_phrase() -> str:
     ]
     return random.choice(variations)
 
+
 def get_booking_phrase(ref: str = "") -> str:
     """Mensagem solícita e calorosa ao redirecionar para agendamento."""
     ref_info = f" para o imóvel Ref {ref}" if ref else ""
     wa_link = f"https://wa.me/558836113000?text=Olá,%20gostaria%20de%20agendar%20uma%20visita{ref_info.replace(' ', '%20')}"
-    
+
     variations = [
         f"Com certeza posso te ajudar! 😊 Clique abaixo para falar diretamente com um dos nossos corretores. Eles adoram atender!\n\n"
         f"{wa_link}\n\n"
         f"Ou ligue para o telefone fixo: (88) 3611-3000.\n\n"
         f"Digite 'voltar' para retornar à lista de imóveis ou 'reiniciar' para fazer uma nova busca.",
-        
         f"Excelente! Para agendar uma visita ou falar com um corretor, clique no link abaixo. Estamos prontos para te receber! 🏡✨\n\n"
         f"{wa_link}\n\n"
         f"Ou se preferir, ligue para: (88) 3611-3000.\n\n"
-        f"Digite 'voltar' para retornar à lista de imóveis ou 'reiniciar' para fazer uma nova busca."
+        f"Digite 'voltar' para retornar à lista de imóveis ou 'reiniciar' para fazer uma nova busca.",
     ]
     return random.choice(variations)
+
 
 def get_farewell_question_phrase(client_name: str | None = None) -> str:
     """Pergunta profissional e amigável se o cliente precisa de mais ajuda, após criar um alerta."""
@@ -223,11 +238,9 @@ def get_farewell_question_phrase(client_name: str | None = None) -> str:
         f"Posso te ajudar com mais alguma coisa{nome}? 😊\n\n"
         "*1️⃣ - Sim*, quero continuar\n"
         "*2️⃣ - Não*, pode encerrar",
-
         f"Fico feliz em ter ajudado{nome}! 🎉 Tem mais alguma coisa em que eu possa te ajudar?\n\n"
         "*1️⃣ - Sim*, quero continuar\n"
         "*2️⃣ - Não*, pode encerrar",
-
         f"Tudo certo{nome}! 👍 Posso fazer mais alguma coisa por você?\n\n"
         "*1️⃣ - Sim*, quero continuar\n"
         "*2️⃣ - Não*, pode encerrar",
@@ -241,10 +254,8 @@ def get_farewell_goodbye_phrase(client_name: str | None = None) -> str:
     variations = [
         f"Foi um prazer te atender{nome}! 😊🏡\n"
         "Estarei sempre aqui caso precise de algo. Até logo e boas buscas! 🌟",
-
         f"Obrigada pela preferência{nome}! 🏡✨\n"
         "Se precisar de qualquer coisa, é só chamar. Até a próxima! 😊",
-
         f"Fico feliz em ter ajudado{nome}! 😊\n"
         "Qualquer dúvida ou nova busca, estarei aqui. Até logo! 👋",
     ]
@@ -258,4 +269,3 @@ def get_farewell_invalid_option_phrase() -> str:
         "Não entendi. 😅 Responda apenas:\n\n*1* para continuar\n*2* para encerrar",
     ]
     return random.choice(variations)
-

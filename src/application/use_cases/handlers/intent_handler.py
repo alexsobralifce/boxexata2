@@ -32,4 +32,3 @@ class IntentHandler(BaseHandler):
         invalid_msg = humanizer.get_intent_invalid_phrase(session.client_name)
         await self.message_gateway.send_text(session.phone, invalid_msg)
         return False
-

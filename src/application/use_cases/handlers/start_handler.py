@@ -25,7 +25,9 @@ class StartHandler(BaseHandler):
         # Se o nome do cliente já foi extraído
         if session.client_name:
             session.transition_to(ConversationStep.INTENT)
-            welcome_msg = humanizer.get_welcome_returning_phrase(session.client_name, bot_name, broker_name)
+            welcome_msg = humanizer.get_welcome_returning_phrase(
+                session.client_name, bot_name, broker_name
+            )
             await self.message_gateway.send_text(session.phone, welcome_msg)
             return False
 
@@ -54,4 +56,3 @@ class StartHandler(BaseHandler):
             session.phone, "Você está buscando um imóvel para **Locação** ou **Venda**?"
         )
         return False
-

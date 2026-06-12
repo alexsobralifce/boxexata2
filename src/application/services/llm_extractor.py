@@ -183,11 +183,13 @@ class LLMPreferenceExtractor(IPreferenceExtractor):
 
         simplified_props = []
         for p in properties:
-            simplified_props.append({
-                "id": p.get("id"),
-                "address": p.get("address"),
-                "neighborhood": p.get("neighborhood")
-            })
+            simplified_props.append(
+                {
+                    "id": p.get("id"),
+                    "address": p.get("address"),
+                    "neighborhood": p.get("neighborhood"),
+                }
+            )
 
         system_prompt = (
             "Você é um especialista em geografia, arruamento e localização da cidade de Sobral, Ceará.\n"
@@ -198,20 +200,27 @@ class LLMPreferenceExtractor(IPreferenceExtractor):
             "Retorne APENAS um objeto JSON válido contendo exatamente a seguinte chave:\n"
             "{\n"
             '  "ranked_properties": [\n'
-            '    {\n'
+            "    {\n"
             '      "id": "ID_DO_IMOVEL",\n'
-            '      "proximity_description": "Breve descrição amigável da proximidade com emoji (ex: \'🚶 Aprox. 5 min a pé / 400m da UFC\', \'🚗 Aprox. 3 min de carro / 1.2km da UFC\')"\n'
-            '    },\n'
-            '    ...\n'
-            '  ]\n'
+            "      \"proximity_description\": \"Breve descrição amigável da proximidade com emoji (ex: '🚶 Aprox. 5 min a pé / 400m da UFC', '🚗 Aprox. 3 min de carro / 1.2km da UFC')\"\n"
+            "    },\n"
+            "    ...\n"
+            "  ]\n"
             "}\n\n"
             "Use apenas os IDs fornecidos. Não adicione novos imóveis. Se um imóvel estiver absurdamente longe ou for impossível de estimar, coloque uma descrição adequada mas ordene-o por último."
         )
 
-        user_content = f"Lista de imóveis para rankear:\n{json.dumps(simplified_props, ensure_ascii=False)}"
+        user_content = (
+            f"Lista de imóveis para rankear:\n{json.dumps(simplified_props, ensure_ascii=False)}"
+        )
 
         try:
-            logger.info("Realizando chamada para LLM para rankeamento de proximidade", provider=provider, model=model, reference_point=reference_point)
+            logger.info(
+                "Realizando chamada para LLM para rankeamento de proximidade",
+                provider=provider,
+                model=model,
+                reference_point=reference_point,
+            )
 
             async def _make_api_call() -> Any:
                 assert client is not None
@@ -234,8 +243,6 @@ class LLMPreferenceExtractor(IPreferenceExtractor):
             data = json.loads(content)
             ranked_list = data.get("ranked_properties", [])
 
-            ranked_map = {item["id"]: item["proximity_description"] for item in ranked_list if "id" in item and "proximity_description" in item}
-
             ordered_properties = []
             for item in ranked_list:
                 pid = item.get("id")
@@ -252,7 +259,9 @@ class LLMPreferenceExtractor(IPreferenceExtractor):
                     prop_copy["proximity"] = None
                     ordered_properties.append(prop_copy)
 
-            logger.info("Rankeamento de proximidade concluído com sucesso", total=len(ordered_properties))
+            logger.info(
+                "Rankeamento de proximidade concluído com sucesso", total=len(ordered_properties)
+            )
             return ordered_properties
 
         except Exception as e:

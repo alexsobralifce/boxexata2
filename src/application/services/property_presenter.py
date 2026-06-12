@@ -3,6 +3,7 @@ from src.domain.repositories.i_message_gateway import IMessageGateway
 from src.domain.repositories.i_property_repository import IPropertyRepository
 from src.shared.logger import logger
 
+
 def _absolutize(base: str, path: str) -> str:
     if not path:
         return ""
@@ -15,6 +16,7 @@ def _absolutize(base: str, path: str) -> str:
     p = c.lstrip("/")
     return f"{b}/{p}" if b else f"/{p}"
 
+
 async def send_property_cards(
     phone: str,
     slice_results: list[dict[str, Any]],
@@ -26,26 +28,28 @@ async def send_property_cards(
     for idx, item in enumerate(slice_results):
         num = start_num + idx
         property_id = item.get("id")
-        
+
         # Carrega detalhes completos do imóvel
         detailed = None
         if property_id:
             try:
                 detailed = await property_repo.find_by_id(property_id)
             except Exception as e:
-                logger.error("Erro ao carregar detalhes para envio de cartões", property_id=property_id, error=str(e))
-        
+                logger.error(
+                    "Erro ao carregar detalhes para envio de cartões",
+                    property_id=property_id,
+                    error=str(e),
+                )
+
         # Prepara dados formatados
         price_val = item.get("value") or (detailed.value.amount if detailed else 0.0)
-        price_fmt = (
-            f"R$ {price_val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-        )
-        
+        price_fmt = f"R$ {price_val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
         ref = item.get("ref") or (detailed.ref if detailed else "N/A")
         address = detailed.address if detailed else item.get("address", "N/A")
         neighborhood = detailed.neighborhood if detailed else item.get("neighborhood", "N/A")
         url = item.get("url") or (detailed.url if detailed else "")
-        
+
         # Características do imóvel
         features_list = detailed.features if (detailed and detailed.features) else []
         features_text = ""
@@ -96,32 +100,26 @@ async def send_property_cards(
             f"\n✨ *Diferenciais*:\n{features_text}\n\n"
             f"🔗 *Ver no site*: {url}"
         )
-        
+
         # Determina fotos a enviar
         photos = detailed.photos if (detailed and detailed.photos) else item.get("photos", [])
         if not photos and item.get("cover_image"):
             photos = [item["cover_image"]]
-        
+
         # Normaliza URLs para absolutas
         base = getattr(property_repo, "site_base_url", "")
         photos = [_absolutize(base, ph) for ph in photos if ph]
-            
+
         cover_photo = photos[0] if photos else None
-        
+
         # Envia imagem
         if cover_photo:
             try:
-                await message_gateway.send_image(
-                    phone,
-                    cover_photo,
-                    f"Imóvel {num} - Ref {ref}"
-                )
+                await message_gateway.send_image(phone, cover_photo, f"Imóvel {num} - Ref {ref}")
             except Exception as ex:
                 logger.warning(
-                    "Erro ao enviar foto do imóvel no card",
-                    url=cover_photo,
-                    error=str(ex)
+                    "Erro ao enviar foto do imóvel no card", url=cover_photo, error=str(ex)
                 )
-        
+
         # Envia texto
         await message_gateway.send_text(phone, card_text)

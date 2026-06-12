@@ -26,16 +26,25 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
         async with db_engine.begin() as conn:
             await conn.run_sync(SQLModel.metadata.create_all)
-            
+
             # Auto-migration fallback for existing databases:
             # Ensure the is_available column exists in the properties table
             try:
                 from sqlmodel import text
+
                 if conn.dialect.name == "postgresql":
-                    await conn.execute(text("ALTER TABLE properties ADD COLUMN IF NOT EXISTS is_available BOOLEAN NOT NULL DEFAULT TRUE"))
+                    await conn.execute(
+                        text(
+                            "ALTER TABLE properties ADD COLUMN IF NOT EXISTS is_available BOOLEAN NOT NULL DEFAULT TRUE"
+                        )
+                    )
                 else:
                     try:
-                        await conn.execute(text("ALTER TABLE properties ADD COLUMN is_available BOOLEAN NOT NULL DEFAULT TRUE"))
+                        await conn.execute(
+                            text(
+                                "ALTER TABLE properties ADD COLUMN is_available BOOLEAN NOT NULL DEFAULT TRUE"
+                            )
+                        )
                     except Exception:
                         pass
             except Exception as e:

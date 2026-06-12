@@ -1,4 +1,3 @@
-from datetime import datetime
 import asyncio
 from typing import Optional
 from src.domain.entities.session import ConversationStep
@@ -16,7 +15,6 @@ from src.application.use_cases.handlers.confirm_criteria_handler import ConfirmC
 from src.application.use_cases.handlers.showing_handler import ShowingHandler
 from src.application.use_cases.handlers.detail_handler import DetailHandler
 from src.application.use_cases.handlers.farewell_handler import FarewellHandler
-from src.shared.config import settings
 from src.shared.logger import logger
 
 
@@ -42,7 +40,9 @@ class HandleMessageUseCase:
         self._handlers = {
             ConversationStep.START: StartHandler(message_gateway),
             ConversationStep.INTENT: IntentHandler(message_gateway),
-            ConversationStep.PREFERENCES: PreferencesHandler(property_repo, message_gateway, extractor),
+            ConversationStep.PREFERENCES: PreferencesHandler(
+                property_repo, message_gateway, extractor
+            ),
             ConversationStep.CONFIRM_CRITERIA: ConfirmCriteriaHandler(message_gateway),
             ConversationStep.SHOWING: ShowingHandler(
                 property_repo, message_gateway, subscription_store

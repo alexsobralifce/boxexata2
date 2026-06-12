@@ -91,7 +91,9 @@ class PropertyListing:
             return False
 
         # Filtra por vagas de garagem mínimas
-        if parking_spaces is not None and (self.parking_spaces is None or self.parking_spaces < parking_spaces):
+        if parking_spaces is not None and (
+            self.parking_spaces is None or self.parking_spaces < parking_spaces
+        ):
             return False
 
         # Filtra por exigência de garagem (pelo menos 1 vaga)

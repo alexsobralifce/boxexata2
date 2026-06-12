@@ -51,6 +51,7 @@ def create_container(settings: Settings) -> dict[str, Any]:
     db_engine: Optional[AsyncEngine] = None
     if settings.database_url:
         from sqlalchemy.ext.asyncio import create_async_engine
+
         db_engine = create_async_engine(settings.database_url)
 
     rate_limiter = RateLimiter(min_delay_seconds=1.0)

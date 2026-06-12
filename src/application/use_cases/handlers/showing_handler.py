@@ -78,7 +78,11 @@ class ShowingHandler(BaseHandler):
             await self.subscription_store.save(subscription)
 
             alert_msg = humanizer.get_alert_activated_phrase(
-                session.client_name, session.property_type, session.neighborhood, session.intent, session.max_value
+                session.client_name,
+                session.property_type,
+                session.neighborhood,
+                session.intent,
+                session.max_value,
             )
             await self.message_gateway.send_text(session.phone, alert_msg)
 
@@ -120,8 +124,7 @@ class ShowingHandler(BaseHandler):
                 slice_results = session.results[next_offset : next_offset + page_size]
 
                 await self.message_gateway.send_text(
-                    session.phone,
-                    "Aqui estão mais algumas opções! 🏡✨👇"
+                    session.phone, "Aqui estão mais algumas opções! 🏡✨👇"
                 )
 
                 await send_property_cards(
@@ -200,7 +203,7 @@ class ShowingHandler(BaseHandler):
                             detail_lines.append(f"- {feat}")
 
                     detail_lines.append(f"\nLink no site: {listing.url}")
-                    
+
                     booking_part = (
                         "\nCom certeza posso te ajudar com isso! 😊 Clique no link abaixo para falar direto com um de nossos corretores no WhatsApp. Eles vão adorar te atender!\n\n"
                         f"https://wa.me/558836113000?text=Olá,%20gostaria%20de%20agendar%20uma%20visita%20para%20o%20imóvel%20Ref%20{listing.ref}\n\n"
@@ -216,4 +219,3 @@ class ShowingHandler(BaseHandler):
         unknown_msg = humanizer.get_unknown_command_phrase()
         await self.message_gateway.send_text(session.phone, unknown_msg)
         return False
-

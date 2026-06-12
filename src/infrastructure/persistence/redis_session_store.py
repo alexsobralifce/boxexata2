@@ -92,7 +92,9 @@ class RedisSessionStore(ISessionStore):
                 "lead_score": session.lead_score,
                 "handoff_reason": session.handoff_reason,
                 "followup_count": session.followup_count,
-                "last_activity_at": session.last_activity_at.isoformat() if session.last_activity_at else None,
+                "last_activity_at": session.last_activity_at.isoformat()
+                if session.last_activity_at
+                else None,
                 # Dados do proprietário
                 "owner_property_type": session.owner_property_type,
                 "owner_neighborhood": session.owner_neighborhood,

@@ -49,7 +49,9 @@ def _build_criteria_summary(session: Session) -> str:
             "3 meses": "Até 3 meses",
             "sem pressa": "Sem pressa",
         }
-        lines.append(f"- *Prazo para mudança*: {deadline_map.get(session.move_deadline, session.move_deadline)}")
+        lines.append(
+            f"- *Prazo para mudança*: {deadline_map.get(session.move_deadline, session.move_deadline)}"
+        )
 
     lines.append("\nEstá correto? Responda *sim* para buscar ou *não* para corrigir os critérios.")
     return "\n".join(lines)
@@ -72,7 +74,19 @@ class ConfirmCriteriaHandler(BaseHandler):
             return False
 
         # Cliente confirmou → avança para busca
-        if clean_text in ("sim", "s", "isso", "correto", "certo", "ok", "pode", "pode buscar", "pode pesquisar", "confirmar", "confirmo"):
+        if clean_text in (
+            "sim",
+            "s",
+            "isso",
+            "correto",
+            "certo",
+            "ok",
+            "pode",
+            "pode buscar",
+            "pode pesquisar",
+            "confirmar",
+            "confirmo",
+        ):
             logger.info("Cliente confirmou critérios de busca", phone=session.phone)
             session.confirmed_search = True
             session.transition_to(ConversationStep.PREFERENCES)

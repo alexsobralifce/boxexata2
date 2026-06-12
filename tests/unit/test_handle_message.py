@@ -18,7 +18,6 @@ def mock_random_choice() -> Any:
 
 
 @pytest.fixture
-
 def test_setup() -> tuple[
     HandleMessageUseCase, FakePropertyRepository, SpyMessageGateway, FakeSessionStore
 ]:
@@ -91,7 +90,10 @@ async def test_full_dialog_flow(test_setup: Any) -> None:
     session = await session_store.get_or_create(phone)
     assert session.step == ConversationStep.START
     assert len(gateway.sent_texts) == 1
-    assert "qual" in gateway.sent_texts[-1]["text"].lower() and "seu nome" in gateway.sent_texts[-1]["text"].lower()
+    assert (
+        "qual" in gateway.sent_texts[-1]["text"].lower()
+        and "seu nome" in gateway.sent_texts[-1]["text"].lower()
+    )
 
     # Step 2: Enviar nome
     await use_case.execute(phone, "Francisco", bypass_hours=True)
@@ -296,7 +298,10 @@ async def test_detail_handler_contact(test_setup: Any) -> None:
     await session_store.save(session)
 
     await use_case.execute(phone, "quero agendar", bypass_hours=True)
-    assert "agendar" in gateway.sent_texts[-1]["text"].lower() or "visita" in gateway.sent_texts[-1]["text"].lower()
+    assert (
+        "agendar" in gateway.sent_texts[-1]["text"].lower()
+        or "visita" in gateway.sent_texts[-1]["text"].lower()
+    )
 
 
 @pytest.mark.asyncio
@@ -321,7 +326,12 @@ async def test_showing_handler_alertar(test_setup: Any) -> None:
     # A última mensagem deve ser a pergunta de encerramento (FAREWELL)
     assert any(
         keyword in gateway.sent_texts[-1]["text"].lower()
-        for keyword in ("posso te ajudar", "ajudar com mais", "fico feliz em ter ajudado", "tudo certo")
+        for keyword in (
+            "posso te ajudar",
+            "ajudar com mais",
+            "fico feliz em ter ajudado",
+            "tudo certo",
+        )
     )
 
     # O estado deve ter transitado para FAREWELL

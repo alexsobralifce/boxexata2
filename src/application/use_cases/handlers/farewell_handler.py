@@ -22,7 +22,9 @@ class FarewellHandler(BaseHandler):
 
         # Opção 1: cliente quer continuar → reinicia o atendimento
         if clean_text in ("1", "sim", "s", "1 sim", "quero continuar", "continuar", "continue"):
-            logger.info("Cliente optou por continuar o atendimento após alerta", phone=session.phone)
+            logger.info(
+                "Cliente optou por continuar o atendimento após alerta", phone=session.phone
+            )
             session.reset_search()
             session.transition_to(ConversationStep.INTENT)
 
@@ -37,7 +39,20 @@ class FarewellHandler(BaseHandler):
             return False
 
         # Opção 2: cliente quer encerrar → despedida calorosa + reset para START
-        if clean_text in ("2", "não", "nao", "n", "2 não", "2 nao", "encerrar", "tchau", "até logo", "ate logo", "obrigado", "obrigada"):
+        if clean_text in (
+            "2",
+            "não",
+            "nao",
+            "n",
+            "2 não",
+            "2 nao",
+            "encerrar",
+            "tchau",
+            "até logo",
+            "ate logo",
+            "obrigado",
+            "obrigada",
+        ):
             logger.info("Cliente optou por encerrar o atendimento após alerta", phone=session.phone)
             goodbye_msg = humanizer.get_farewell_goodbye_phrase(session.client_name)
             await self.message_gateway.send_text(session.phone, goodbye_msg)

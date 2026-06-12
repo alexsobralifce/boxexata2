@@ -28,7 +28,7 @@ class PreferencesHandler(BaseHandler):
                 session.phone,
                 "Qual tipo de imóvel você procura? 🏡 (Ex: casa, apartamento, quitinete, etc.)\n\n"
                 "💡 *Dica:* Fique à vontade para descrever em detalhes o que você busca! Por exemplo: "
-                '*“casa com 3 quartos, garagem e 2 banheiros”* ou *“apartamento mobiliado perto do shopping”*. '
+                "*“casa com 3 quartos, garagem e 2 banheiros”* ou *“apartamento mobiliado perto do shopping”*. "
                 "Nosso sistema vai ler e filtrar as melhores opções para você. 😉",
             )
             return False
@@ -74,7 +74,11 @@ class PreferencesHandler(BaseHandler):
             return False
 
         if not results:
-            location_label = f"no bairro {session.neighborhood}" if session.neighborhood else f"próximo a {session.reference_point}"
+            location_label = (
+                f"no bairro {session.neighborhood}"
+                if session.neighborhood
+                else f"próximo a {session.reference_point}"
+            )
             msg = humanizer.get_not_found_phrase(
                 session.client_name, session.property_type, location_label, session.max_value
             )
@@ -102,10 +106,7 @@ class PreferencesHandler(BaseHandler):
         slice_results = results_dicts[:page_size]
 
         success_msg = humanizer.get_search_success_phrase(session.client_name)
-        await self.message_gateway.send_text(
-            session.phone,
-            success_msg
-        )
+        await self.message_gateway.send_text(session.phone, success_msg)
 
         # Envia os cartões (imagem + texto detalhado)
         await send_property_cards(
@@ -125,4 +126,3 @@ class PreferencesHandler(BaseHandler):
         )
         await self.message_gateway.send_text(session.phone, footer_msg)
         return False
-

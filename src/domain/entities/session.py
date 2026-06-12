@@ -5,16 +5,16 @@ from typing import Any, Optional
 
 class ConversationStep(Enum):
     START = auto()
-    INTENT = auto()           # Locação, Venda, Anunciar, FAQ, Corretor
-    PREFERENCES = auto()      # Tipo, Bairro, Valor, Quartos...
-    CONFIRM_CRITERIA = auto() # Confirmação dos critérios antes de buscar
+    INTENT = auto()  # Locação, Venda, Anunciar, FAQ, Corretor
+    PREFERENCES = auto()  # Tipo, Bairro, Valor, Quartos...
+    CONFIRM_CRITERIA = auto()  # Confirmação dos critérios antes de buscar
     SEARCHING = auto()
     SHOWING = auto()
     DETAIL = auto()
-    FAQ = auto()              # Dúvidas financeiras/documentais
-    OWNER_ONBOARDING = auto() # Proprietário que quer anunciar imóvel
-    HANDOFF = auto()          # Transferência para corretor humano
-    FAREWELL = auto()         # Encerramento após alerta — "posso ajudar em mais algo?"
+    FAQ = auto()  # Dúvidas financeiras/documentais
+    OWNER_ONBOARDING = auto()  # Proprietário que quer anunciar imóvel
+    HANDOFF = auto()  # Transferência para corretor humano
+    FAREWELL = auto()  # Encerramento após alerta — "posso ajudar em mais algo?"
 
 
 class Session:
@@ -25,7 +25,7 @@ class Session:
         phone: str,
         step: ConversationStep = ConversationStep.START,
         client_name: Optional[str] = None,
-        intent: Optional[str] = None,      # "Locação" | "Venda"
+        intent: Optional[str] = None,  # "Locação" | "Venda"
         property_type: Optional[str] = None,
         neighborhood: Optional[str] = None,
         max_value: Optional[float] = None,
@@ -40,8 +40,8 @@ class Session:
         parking: Optional[bool] = None,
         pet_friendly: Optional[bool] = None,
         furnished: Optional[bool] = None,
-        move_deadline: Optional[str] = None,   # "urgente" | "1 mês" | "3 meses" | "sem pressa"
-        persona: Optional[str] = None,         # "buyer" | "renter" | "owner" | "faq" | "visitor"
+        move_deadline: Optional[str] = None,  # "urgente" | "1 mês" | "3 meses" | "sem pressa"
+        persona: Optional[str] = None,  # "buyer" | "renter" | "owner" | "faq" | "visitor"
         lead_score: int = 0,
         handoff_reason: Optional[str] = None,
         # --- Campos de follow-up por silêncio (Fase 4) ---

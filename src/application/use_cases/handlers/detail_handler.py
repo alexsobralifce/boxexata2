@@ -40,8 +40,7 @@ class DetailHandler(BaseHandler):
             slice_results = session.results[offset : offset + page_size]
 
             await self.message_gateway.send_text(
-                session.phone,
-                "Aqui estão as opções novamente! 🏡✨👇"
+                session.phone, "Aqui estão as opções novamente! 🏡✨👇"
             )
 
             await send_property_cards(
@@ -78,4 +77,3 @@ class DetailHandler(BaseHandler):
         full_msg = f"{booking_msg}\n\n{footer}"
         await self.message_gateway.send_text(session.phone, full_msg)
         return False
-

@@ -241,6 +241,7 @@ async def list_properties(
                 all_basics = await property_repo._scrape_all_basic_listings()
                 from src.domain.entities.property_listing import PropertyListing
                 from src.domain.value_objects.money import Money
+
                 for pid, basic in all_basics.items():
                     listing = PropertyListing(
                         property_id=pid,
@@ -251,7 +252,7 @@ async def list_properties(
                         value=Money(basic["price"]),
                         url=basic["url"],
                         photos=[basic["cover_image"]] if basic["cover_image"] else [],
-                        intent=basic["intent"]
+                        intent=basic["intent"],
                     )
                     await property_repo.save(listing)
 
@@ -271,9 +272,7 @@ async def list_properties(
     result = []
     for p in properties:
         d = p.to_dict()
-        d["photos"] = [
-            property_repo._absolutize_url(base, ph) for ph in (d.get("photos") or [])
-        ]
+        d["photos"] = [property_repo._absolutize_url(base, ph) for ph in (d.get("photos") or [])]
         result.append(d)
     return result
 
@@ -319,7 +318,7 @@ async def scrape_all_properties(
         basics = await property_repo._scrape_all_basic_listings()
         total_scraped = 0
         scraped_refs = []
-        
+
         for pid, basic in basics.items():
             try:
                 # Realiza scrape completo do detalhe e salva no banco
@@ -334,8 +333,12 @@ async def scrape_all_properties(
                     cache_key = f"property_detail_{pid}"
                     await property_repo.cache.delete(cache_key)
             except Exception as ex:
-                logger.error("Falha ao raspar detalhes do imóvel individual na carga total", pid=pid, error=str(ex))
-                
+                logger.error(
+                    "Falha ao raspar detalhes do imóvel individual na carga total",
+                    pid=pid,
+                    error=str(ex),
+                )
+
         return {"status": "success", "total_scraped": total_scraped, "scraped_refs": scraped_refs}
     except Exception as e:
         logger.error("Erro geral na raspagem de todos os imóveis", error=str(e))

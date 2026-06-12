@@ -103,9 +103,7 @@ async def test_llm_extractor_reference_point() -> None:
     mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
 
     extractor = LLMPreferenceExtractor(client=mock_client)
-    res = await extractor.extract(
-        "quero alugar uma casa perto da UFC", []
-    )
+    res = await extractor.extract("quero alugar uma casa perto da UFC", [])
 
     assert res.get("reference_point") == "UFC"
     assert res.get("intent") == "Locação"
@@ -120,7 +118,7 @@ async def test_llm_proximity_ranking() -> None:
         '{"ranked_properties": ['
         '  {"id": "103", "proximity_description": "🚶 Aprox. 3 min a pé da UFC"},'
         '  {"id": "101", "proximity_description": "🚗 Aprox. 5 min de carro da UFC"}'
-        ']}'
+        "]}"
     )
     mock_response.choices = [mock_choices]
 
@@ -130,7 +128,7 @@ async def test_llm_proximity_ranking() -> None:
     extractor = LLMPreferenceExtractor(client=mock_client)
     properties = [
         {"id": "101", "ref": "REF101", "address": "Rua A", "neighborhood": "Centro"},
-        {"id": "103", "ref": "REF103", "address": "Rua C", "neighborhood": "Junco"}
+        {"id": "103", "ref": "REF103", "address": "Rua C", "neighborhood": "Junco"},
     ]
     res = await extractor.rank_properties_by_proximity("UFC", properties)
 
