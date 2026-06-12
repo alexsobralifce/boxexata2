@@ -10,6 +10,19 @@ from src.application.services.property_presenter import send_property_cards
 from src.application.services import humanizer
 
 
+def _absolutize(base: str, path: str) -> str:
+    if not path:
+        return ""
+    c = path.strip()
+    if not c:
+        return ""
+    if c.startswith("http://") or c.startswith("https://") or c.startswith("//"):
+        return c
+    b = (base or "").rstrip("/")
+    p = c.lstrip("/")
+    return f"{b}/{p}" if b else f"/{p}"
+
+
 class ShowingHandler(BaseHandler):
     """Handler para a etapa SHOWING (exibição de resultados e seleção)."""
 
@@ -156,7 +169,10 @@ class ShowingHandler(BaseHandler):
                     session.transition_to(ConversationStep.DETAIL)
 
                     limit = settings.max_photos_per_property
-                    photos_to_send = listing.photos[:limit] if listing.photos else []
+                    base = getattr(self.property_repo, "site_base_url", "")
+                    photos_to_send = [
+                        _absolutize(base, ph) for ph in (listing.photos or [])[:limit] if ph
+                    ]
                     for photo in photos_to_send:
                         if photo:
                             try:

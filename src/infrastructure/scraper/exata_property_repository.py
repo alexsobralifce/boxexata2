@@ -132,6 +132,31 @@ class ExataPropertyRepository(IPropertyRepository):
             logger.warn("Falha ao converter valor do imóvel para float", raw_value=val_str)
             return 0.0
 
+    @staticmethod
+    def _absolutize_url(base_url: str, maybe_relative: str) -> str:
+        """Concatena base + path tratando casos problemáticos de URL.
+
+        - Retorna string vazia se o caminho for vazio.
+        - Preserva URLs já absolutas (``http://``, ``https://`` ou ``//cdn...``).
+        - Normaliza barras duplicadas ao juntar base e path.
+        """
+        if not maybe_relative:
+            return ""
+        candidate = maybe_relative.strip()
+        if not candidate:
+            return ""
+        if (
+            candidate.startswith("http://")
+            or candidate.startswith("https://")
+            or candidate.startswith("//")
+        ):
+            return candidate
+        base = (base_url or "").rstrip("/")
+        path = candidate.lstrip("/")
+        if not base:
+            return f"/{path}"
+        return f"{base}/{path}"
+
     async def _fetch_html(self, url: str) -> str:
         """Faz a requisição HTTP respeitando rate limiting e retorna o HTML."""
         await self.rate_limiter.wait()
@@ -179,8 +204,7 @@ class ExataPropertyRepository(IPropertyRepository):
             img_tag = div.find("img")
             src_val = img_tag.get("src") if img_tag else None
             cover_image = src_val if src_val and not isinstance(src_val, list) else ""
-            if cover_image and not cover_image.startswith("http"):
-                cover_image = f"{self.site_base_url}/{cover_image}"
+            cover_image = self._absolutize_url(self.site_base_url, cover_image)
 
             text_parts = div.get_text("|", strip=True).split("|")
             parts = [p.strip() for p in text_parts if p.strip()]
@@ -225,7 +249,7 @@ class ExataPropertyRepository(IPropertyRepository):
                 "neighborhood": neighborhood,
                 "price": price_val,
                 "cover_image": cover_image,
-                "url": f"{self.site_base_url}/{href}",
+                "url": self._absolutize_url(self.site_base_url, href),
             }
 
         await self.cache.set(cache_key, listings)
@@ -702,10 +726,8 @@ class ExataPropertyRepository(IPropertyRepository):
         for a in soup.find_all("a", class_="fancybox"):
             href_val = a.get("href")
             if href_val and not isinstance(href_val, list):
-                href = href_val
-                if not href.startswith("http"):
-                    href = f"{self.site_base_url}/{href}"
-                if href not in photos:
+                href = self._absolutize_url(self.site_base_url, href_val)
+                if href and href not in photos:
                     photos.append(href)
 
         # Fallbacks basic info

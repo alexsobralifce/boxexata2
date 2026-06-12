@@ -3,6 +3,18 @@ from src.domain.repositories.i_message_gateway import IMessageGateway
 from src.domain.repositories.i_property_repository import IPropertyRepository
 from src.shared.logger import logger
 
+def _absolutize(base: str, path: str) -> str:
+    if not path:
+        return ""
+    c = path.strip()
+    if not c:
+        return ""
+    if c.startswith("http://") or c.startswith("https://") or c.startswith("//"):
+        return c
+    b = (base or "").rstrip("/")
+    p = c.lstrip("/")
+    return f"{b}/{p}" if b else f"/{p}"
+
 async def send_property_cards(
     phone: str,
     slice_results: list[dict[str, Any]],
@@ -89,6 +101,10 @@ async def send_property_cards(
         photos = detailed.photos if (detailed and detailed.photos) else item.get("photos", [])
         if not photos and item.get("cover_image"):
             photos = [item["cover_image"]]
+        
+        # Normaliza URLs para absolutas
+        base = getattr(property_repo, "site_base_url", "")
+        photos = [_absolutize(base, ph) for ph in photos if ph]
             
         cover_photo = photos[0] if photos else None
         

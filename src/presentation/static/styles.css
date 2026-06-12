@@ -2,21 +2,23 @@
    VARIÁVEIS E CORES DO TEMA (DARK PREMIUM)
    ========================================== */
 :root {
-    --bg-dark: #090a10;
-    --bg-card: rgba(18, 20, 32, 0.65);
-    --border-color: rgba(255, 255, 255, 0.08);
-    --border-focus: rgba(147, 51, 234, 0.6);
+    --bg-dark: #09090b;
+    --bg-card: rgba(24, 24, 27, 0.65);
+    --border-color: rgba(39, 39, 42, 0.8);
+    --border-focus: rgba(22, 163, 74, 0.6);
     --text-primary: #f3f4f6;
-    --text-secondary: #9ca3af;
-    --text-muted: #6b7280;
-    
-    --primary-color: #6366f1; /* Indigo */
-    --primary-hover: #4f46e5;
-    --secondary-color: #2563eb; /* Azul */
-    --accent-color: #a855f7; /* Roxo */
-    --success-color: #10b981; /* Verde */
-    --danger-color: #ef4444; /* Vermelho */
-    
+    --text-secondary: #a1a1aa;
+    --text-muted: #71717a;
+
+    --primary-color: #16a34a;        /* green-600 (Exata brand) */
+    --primary-hover: #15803d;        /* green-700 */
+    --primary-light: #22c55e;        /* green-500 */
+    --primary-ring: rgba(22, 163, 74, 0.2);
+    --secondary-color: #22c55e;      /* green-500 */
+    --accent-color: #22c55e;         /* green-500 */
+    --success-color: #16a34a;        /* green-600 */
+    --danger-color: #ef4444;         /* red-500 */
+
     --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     --transition-fast: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     --transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -63,7 +65,7 @@ body {
     left: 10%;
     width: 500px;
     height: 500px;
-    background: radial-gradient(circle, var(--accent-color) 0%, transparent 80%);
+    background: radial-gradient(circle, var(--primary-light) 0%, transparent 80%);
     animation: rotateGlow 25s infinite alternate;
 }
 
@@ -126,7 +128,7 @@ body {
 .card-header h2 {
     font-size: 2.2rem;
     font-weight: 700;
-    background: linear-gradient(135deg, #fff 0%, var(--primary-color) 100%);
+    background: linear-gradient(135deg, #fff 0%, var(--primary-light) 100%);
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -171,7 +173,7 @@ body {
 .form-group select:focus {
     border-color: var(--primary-color);
     background: rgba(255, 255, 255, 0.07);
-    box-shadow: 0 0 10px rgba(99, 102, 241, 0.2);
+    box-shadow: 0 0 10px var(--primary-ring);
 }
 
 .form-row-checkbox {
@@ -222,14 +224,15 @@ body {
 }
 
 .btn-primary {
-    background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-light) 100%);
     color: #fff;
-    box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+    box-shadow: 0 4px 15px var(--primary-ring);
 }
 
 .btn-primary:hover {
+    background: linear-gradient(135deg, var(--primary-hover) 0%, var(--primary-color) 100%);
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+    box-shadow: 0 6px 20px rgba(22, 163, 74, 0.4);
 }
 
 .btn-secondary {
@@ -293,7 +296,7 @@ body {
     font-size: 1.6rem;
     font-weight: 700;
     letter-spacing: -0.5px;
-    background: linear-gradient(135deg, #fff 0%, var(--accent-color) 100%);
+    background: linear-gradient(135deg, #fff 0%, var(--primary-light) 100%);
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -341,7 +344,7 @@ body {
 
 .nav-link.active {
     color: #fff;
-    background: rgba(99, 102, 241, 0.15);
+    background: rgba(22, 163, 74, 0.15);
     border-left: 3px solid var(--primary-color);
 }
 
@@ -487,15 +490,15 @@ tr:hover td {
 }
 
 .badge-in {
-    background: rgba(16, 185, 129, 0.15);
+    background: rgba(22, 163, 74, 0.15);
     color: var(--success-color);
-    border: 1px solid rgba(16, 185, 129, 0.3);
+    border: 1px solid rgba(22, 163, 74, 0.3);
 }
 
 .badge-out {
-    background: rgba(99, 102, 241, 0.15);
-    color: var(--primary-color);
-    border: 1px solid rgba(99, 102, 241, 0.3);
+    background: rgba(22, 163, 74, 0.12);
+    color: var(--primary-light);
+    border: 1px solid rgba(22, 163, 74, 0.25);
 }
 
 .text-center { text-align: center; }
@@ -673,9 +676,9 @@ tr:hover td {
 }
 
 .scraper-status-box.success {
-    background: rgba(16, 185, 129, 0.15);
+    background: rgba(22, 163, 74, 0.15);
     color: var(--success-color);
-    border: 1px solid rgba(16, 185, 129, 0.3);
+    border: 1px solid rgba(22, 163, 74, 0.3);
 }
 
 .scraper-status-box.error {
@@ -685,9 +688,9 @@ tr:hover td {
 }
 
 .scraper-status-box.loading {
-    background: rgba(168, 85, 247, 0.15);
-    color: var(--accent-color);
-    border: 1px solid rgba(168, 85, 247, 0.3);
+    background: rgba(22, 163, 74, 0.12);
+    color: var(--primary-light);
+    border: 1px solid rgba(22, 163, 74, 0.25);
 }
 
 .manual-creation-info {
@@ -717,15 +720,6 @@ tr:hover td {
     gap: 4px;
 }
 
-.prop-image-thumb {
-    width: 50px;
-    height: 50px;
-    border-radius: 8px;
-    object-fit: cover;
-    border: 1px solid var(--border-color);
-    background: #1f2937;
-}
-
 /* Actions in Properties table */
 .prop-actions {
     display: flex;
@@ -750,12 +744,12 @@ tr:hover td {
 
 .btn-action-icon.copy:hover {
     color: var(--success-color);
-    border-color: rgba(16, 185, 129, 0.4);
+    border-color: rgba(22, 163, 74, 0.4);
 }
 
 .btn-action-icon.edit:hover {
     color: var(--primary-color);
-    border-color: rgba(99, 102, 241, 0.4);
+    border-color: rgba(22, 163, 74, 0.4);
 }
 
 .btn-action-icon.delete:hover {
@@ -791,7 +785,7 @@ tr:hover td {
 .crud-form textarea:focus {
     border-color: var(--primary-color);
     background: rgba(255, 255, 255, 0.07);
-    box-shadow: 0 0 10px rgba(99, 102, 241, 0.2);
+    box-shadow: 0 0 10px var(--primary-ring);
 }
 
 /* Modal Dialog Glassmorphism style */
@@ -859,7 +853,7 @@ tr:hover td {
     position: fixed;
     bottom: 30px;
     right: 30px;
-    background: rgba(16, 185, 129, 0.95);
+    background: rgba(22, 163, 74, 0.95);
     color: #fff;
     padding: 12px 24px;
     border-radius: 8px;

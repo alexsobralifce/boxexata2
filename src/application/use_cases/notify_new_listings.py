@@ -5,6 +5,19 @@ from src.domain.repositories.i_subscription_store import ISubscriptionStore
 from src.shared.logger import logger
 
 
+def _absolutize(base: str, path: str) -> str:
+    if not path:
+        return ""
+    c = path.strip()
+    if not c:
+        return ""
+    if c.startswith("http://") or c.startswith("https://") or c.startswith("//"):
+        return c
+    b = (base or "").rstrip("/")
+    p = c.lstrip("/")
+    return f"{b}/{p}" if b else f"/{p}"
+
+
 class NotifyNewListingsUseCase:
     """Caso de uso para checer e notificar usuários sobre novos imóveis correspondentes às suas assinaturas."""
 
@@ -64,18 +77,20 @@ class NotifyNewListingsUseCase:
 
                     for listing in new_listings:
                         # Envia foto se disponível
-                        if listing.photos:
+                        base = getattr(self.property_repo, "site_base_url", "")
+                        photo_url = _absolutize(base, listing.photos[0]) if listing.photos else None
+                        if photo_url:
                             try:
                                 await self.message_gateway.send_image(
                                     sub.phone,
-                                    listing.photos[0],
+                                    photo_url,
                                     f"Nova opção de {listing.property_type.lower()} no bairro {listing.neighborhood}!",
                                 )
                             except Exception as e:
                                 logger.warning(
                                     "Falha ao enviar foto do alerta",
                                     phone=sub.phone,
-                                    url=listing.photos[0],
+                                    url=photo_url,
                                     error=str(e),
                                 )
 

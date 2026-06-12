@@ -267,7 +267,15 @@ async def list_properties(
         ref=ref,
         is_available=is_available,
     )
-    return [p.to_dict() for p in properties]
+    base = property_repo.site_base_url
+    result = []
+    for p in properties:
+        d = p.to_dict()
+        d["photos"] = [
+            property_repo._absolutize_url(base, ph) for ph in (d.get("photos") or [])
+        ]
+        result.append(d)
+    return result
 
 
 @router.post("/properties/scrape", response_model=dict[str, Any])
@@ -286,7 +294,10 @@ async def scrape_property_by_ref(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Imóvel com referência {req.ref} não encontrado no site Exata.",
             )
-        return {"status": "success", "property": scraped.to_dict()}
+        base = property_repo.site_base_url
+        d = scraped.to_dict()
+        d["photos"] = [property_repo._absolutize_url(base, ph) for ph in (d.get("photos") or [])]
+        return {"status": "success", "property": d}
     except Exception as e:
         logger.error("Falha ao raspar imóvel via admin API", ref=req.ref, error=str(e))
         raise HTTPException(
@@ -367,7 +378,10 @@ async def save_or_update_property(
     )
 
     await property_repo.save(listing)
-    return {"status": "success", "property": listing.to_dict()}
+    base = property_repo.site_base_url
+    d = listing.to_dict()
+    d["photos"] = [property_repo._absolutize_url(base, ph) for ph in (d.get("photos") or [])]
+    return {"status": "success", "property": d}
 
 
 @router.delete("/properties/{property_id}", response_model=dict[str, str])

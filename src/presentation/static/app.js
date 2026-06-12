@@ -455,24 +455,16 @@ async function loadProperties() {
             
             const descTrunc = p.description ? (p.description.length > 80 ? p.description.substring(0, 80) + '...' : p.description) : '-';
 
-            const photoUrl = p.photos && p.photos.length > 0 ? p.photos[0] : '';
-            const imgHtml = photoUrl ? `<img class="prop-image-thumb" src="${escapeHtml(photoUrl)}" alt="Foto">` : '<div class="prop-image-thumb text-center" style="display:flex;align-items:center;justify-content:center;font-size:1.5rem;">🏡</div>';
-
-            const statusBadge = p.is_available 
-                ? '<span class="badge badge-in" style="background: rgba(16,185,129,0.1); color:#10b981; border: 1px solid rgba(16,185,129,0.2); margin-top:4px; font-size:0.65rem; padding: 2px 6px;">Disponível</span>' 
+            const statusBadge = p.is_available
+                ? '<span class="badge badge-in" style="background: rgba(22,163,74,0.1); color:#16a34a; border: 1px solid rgba(22,163,74,0.25); margin-top:4px; font-size:0.65rem; padding: 2px 6px;">Disponível</span>'
                 : '<span class="badge badge-out" style="background: rgba(239,68,68,0.1); color:#ef4444; border: 1px solid rgba(239,68,68,0.2); margin-top:4px; font-size:0.65rem; padding: 2px 6px;">Indisponível</span>';
 
             return `
                 <tr>
                     <td>
-                        <div style="display:flex;align-items:center;gap:12px;">
-                            ${imgHtml}
-                            <div>
-                                <span class="text-bold">${escapeHtml(p.ref || 'S/Ref')}</span><br>
-                                ${statusBadge}<br>
-                                <span class="text-muted" style="font-size:0.75rem;">ID: ${escapeHtml(p.id)}</span>
-                            </div>
-                        </div>
+                        <span class="text-bold">${escapeHtml(p.ref || 'S/Ref')}</span><br>
+                        ${statusBadge}<br>
+                        <span class="text-muted" style="font-size:0.75rem;">ID: ${escapeHtml(p.id)}</span>
                     </td>
                     <td>
                         <span class="text-bold">${escapeHtml(p.property_type)}</span><br>
