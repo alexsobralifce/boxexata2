@@ -139,10 +139,13 @@ class ExataPropertyRepository(IPropertyRepository):
         async with httpx.AsyncClient(headers=self.headers, timeout=self.timeout) as client:
             response = await client.get(url)
             response.raise_for_status()
-            content_type = response.headers.get("content-type", "").lower()
-            if "utf-8" not in content_type:
-                response.encoding = "iso-8859-1"
-            return response.text
+            
+            # Tenta decodificar como UTF-8; se houver erro, decodifica como ISO-8859-1
+            try:
+                content = response.content.decode("utf-8")
+            except UnicodeDecodeError:
+                content = response.content.decode("iso-8859-1")
+            return content
 
     async def _scrape_all_basic_listings(self) -> dict[str, dict[str, Any]]:
         """Busca a listagem completa em imovel.php e constrói dicionário por ID."""
@@ -405,10 +408,16 @@ class ExataPropertyRepository(IPropertyRepository):
             async with AsyncSession(self.engine) as db_session:
                 model = await db_session.get(Properties, property_id)
                 if model and model.description:
-                    logger.info("Recuperando imóvel detalhado do banco de dados", id=property_id)
-                    entity = model.to_entity()
-                    await self.cache.set(cache_key, entity)
-                    return entity
+                    # Se a descrição contiver o menu do site por erro anterior, vamos re-scrapar para corrigir
+                    desc_lower = model.description.lower()
+                    has_menu = "residencialcasa" in desc_lower or ("residencial" in desc_lower and "quitinete" in desc_lower and "apartamento" in desc_lower)
+                    if not has_menu:
+                        logger.info("Recuperando imóvel detalhado do banco de dados", id=property_id)
+                        entity = model.to_entity()
+                        await self.cache.set(cache_key, entity)
+                        return entity
+                    else:
+                        logger.info("Imóvel no BD possui menu na descrição, forçando re-scrape para correção", id=property_id)
 
         all_basics = await self._scrape_all_basic_listings()
         basic = all_basics.get(property_id)
@@ -614,23 +623,56 @@ class ExataPropertyRepository(IPropertyRepository):
 
         # Descrição/Características
         desc_td = None
+        details_table = None
         for strong in soup.find_all("strong"):
             lbl = strong.get_text(strip=True).lower()
-            if "descrição" in lbl or "descricao" in lbl:
-                # O texto da descrição geralmente está no td abaixo ou na mesma linha
-                parent_tr = strong.find_parent("tr")
-                if parent_tr:
-                    next_tr = parent_tr.find_next_sibling("tr")
-                    if next_tr:
-                        desc_td = next_tr.find("td")
-                        break
+            if "código" in lbl or "codigo" in lbl:
+                details_table = strong.find_parent("table")
+                break
+
+        if details_table:
+            for strong in details_table.find_all("strong"):
+                lbl = strong.get_text(strip=True).lower()
+                if "descrição" in lbl or "descricao" in lbl:
+                    parent_tr = strong.find_parent("tr")
+                    if parent_tr:
+                        next_tr = parent_tr.find_next_sibling("tr")
+                        if next_tr:
+                            desc_td = next_tr.find("td")
+                            break
+
+        if not desc_td:
+            # Se não achou dentro da tabela de detalhes, busca na página inteira
+            for strong in soup.find_all("strong"):
+                lbl = strong.get_text(strip=True).lower()
+                if "descrição" in lbl or "descricao" in lbl:
+                    parent_tr = strong.find_parent("tr")
+                    if parent_tr:
+                        next_tr = parent_tr.find_next_sibling("tr")
+                        if next_tr:
+                            desc_td = next_tr.find("td")
+                            break
         
         description_raw = desc_td.decode_contents() if desc_td else ""
         if not description_raw:
-            # Fallback a procurar ul
-            ul_tag = soup.find("ul")
-            if ul_tag:
-                description_raw = ul_tag.decode_contents()
+            # Fallback a procurar ul, mas evitando o menu principal
+            target_ul = None
+            if details_table:
+                target_ul = details_table.find("ul")
+            
+            if not target_ul:
+                for ul in soup.find_all("ul"):
+                    ul_text = ul.get_text().lower()
+                    # Menus têm muitos tipos de imóveis juntos
+                    menu_keywords = ["residencial", "comercial", "quitinete", "ponto comercial", "salas"]
+                    matches = sum(1 for kw in menu_keywords if kw in ul_text)
+                    if matches >= 3:
+                        continue
+                    target_ul = ul
+                    break
+
+            if target_ul:
+                description_raw = target_ul.decode_contents()
 
         description_formatted = ""
         bedrooms = None
