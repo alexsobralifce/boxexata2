@@ -12,6 +12,7 @@ from src.domain.entities.message_log import MessageLog
 from src.application.use_cases.handlers.start_handler import StartHandler
 from src.application.use_cases.handlers.intent_handler import IntentHandler
 from src.application.use_cases.handlers.preferences_handler import PreferencesHandler
+from src.application.use_cases.handlers.confirm_criteria_handler import ConfirmCriteriaHandler
 from src.application.use_cases.handlers.showing_handler import ShowingHandler
 from src.application.use_cases.handlers.detail_handler import DetailHandler
 from src.shared.config import settings
@@ -41,6 +42,7 @@ class HandleMessageUseCase:
             ConversationStep.START: StartHandler(message_gateway),
             ConversationStep.INTENT: IntentHandler(message_gateway),
             ConversationStep.PREFERENCES: PreferencesHandler(property_repo, message_gateway, extractor),
+            ConversationStep.CONFIRM_CRITERIA: ConfirmCriteriaHandler(message_gateway),
             ConversationStep.SHOWING: ShowingHandler(
                 property_repo, message_gateway, subscription_store
             ),

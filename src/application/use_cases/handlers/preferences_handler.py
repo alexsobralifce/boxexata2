@@ -38,7 +38,17 @@ class PreferencesHandler(BaseHandler):
             )
             return False
 
-        # Se temos as preferências mínimas (tipo e local/bairro), realiza a busca
+        # Critérios mínimos preenchidos → redireciona para confirmação antes de buscar
+        # A flag _confirmed_search é setada pelo ConfirmCriteriaHandler após aprovação
+        if not getattr(session, "_confirmed_search", False):
+            session.transition_to(ConversationStep.CONFIRM_CRITERIA)
+            return True  # ConfirmCriteriaHandler vai exibir o resumo
+
+        # Se chegou aqui com _confirmed_search=True, reseta a flag e executa a busca
+        session._confirmed_search = False  # type: ignore[attr-defined]
+
+        # Se temos as preferências confirmadas, realiza a busca
+
         logger.info(
             "Preferências completas. Iniciando busca no repositório de imóveis.",
             phone=session.phone,

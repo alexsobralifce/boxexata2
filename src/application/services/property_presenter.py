@@ -52,16 +52,37 @@ async def send_property_cards(
         if item.get("proximity"):
             proximity_text = f"📍 *Proximidade*: {item.get('proximity')}\n"
 
+        # Monta linha de destaques (quartos / banheiros / vagas / área)
+        highlights = []
+        bedrooms_val = item.get("bedrooms") or (detailed.bedrooms if detailed else None)
+        bathrooms_val = item.get("bathrooms") or (detailed.bathrooms if detailed else None)
+        parking_val = item.get("parking_spaces") or (detailed.parking_spaces if detailed else None)
+        area_val = item.get("area_m2") or (detailed.area_m2 if detailed else None)
+
+        if bedrooms_val:
+            highlights.append(f"🛏️ {bedrooms_val} quarto{'s' if bedrooms_val > 1 else ''}")
+        if bathrooms_val:
+            highlights.append(f"🚿 {bathrooms_val} banheiro{'s' if bathrooms_val > 1 else ''}")
+        if parking_val:
+            highlights.append(f"🚗 {parking_val} vaga{'s' if parking_val > 1 else ''}")
+        if area_val:
+            highlights.append(f"📐 {area_val:.0f} m²")
+
+        highlights_line = "  |  ".join(highlights)
+
         # Constrói o texto do card com emojis
         card_text = (
-            f"🏡 *{num}. {item.get('property_type', 'Imóvel')} no bairro {neighborhood}*\n\n"
+            f"🏡 *{num}. {item.get('property_type', 'Imóvel')} — {neighborhood}*\n\n"
             f"💰 *Valor*: {price_fmt}\n"
-            f"🆔 *Ref*: {ref}\n"
+        )
+        if highlights_line:
+            card_text += f"{highlights_line}\n"
+        card_text += (
             f"📍 *Endereço*: {address}\n"
-            f"🏢 *Bairro*: {neighborhood}\n"
+            f"🆔 *Ref*: {ref}\n"
             f"{proximity_text}"
-            f"✨ *Características / Descrição*:\n{features_text}\n\n"
-            f"🔗 *Link para fotos e site*: {url}"
+            f"\n✨ *Diferenciais*:\n{features_text}\n\n"
+            f"🔗 *Ver no site*: {url}"
         )
         
         # Determina fotos a enviar

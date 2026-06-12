@@ -40,6 +40,22 @@ class RedisSessionStore(ISessionStore):
                     selected_property_id=data.get("selected_property_id"),
                     history=data.get("history"),
                     reference_point=data.get("reference_point"),
+                    # Campos avançados
+                    bedrooms_min=data.get("bedrooms_min"),
+                    parking=data.get("parking"),
+                    pet_friendly=data.get("pet_friendly"),
+                    furnished=data.get("furnished"),
+                    move_deadline=data.get("move_deadline"),
+                    persona=data.get("persona"),
+                    lead_score=data.get("lead_score", 0),
+                    handoff_reason=data.get("handoff_reason"),
+                    followup_count=data.get("followup_count", 0),
+                    # Dados do proprietário
+                    owner_property_type=data.get("owner_property_type"),
+                    owner_neighborhood=data.get("owner_neighborhood"),
+                    owner_value=data.get("owner_value"),
+                    owner_availability=data.get("owner_availability"),
+                    owner_step=data.get("owner_step", 0),
                 )
         except Exception as e:
             logger.error("Erro ao buscar sessão no RedisSessionStore", phone=phone, error=str(e))
@@ -64,6 +80,23 @@ class RedisSessionStore(ISessionStore):
                 "selected_property_id": session.selected_property_id,
                 "history": session.history,
                 "reference_point": session.reference_point,
+                # Campos avançados
+                "bedrooms_min": session.bedrooms_min,
+                "parking": session.parking,
+                "pet_friendly": session.pet_friendly,
+                "furnished": session.furnished,
+                "move_deadline": session.move_deadline,
+                "persona": session.persona,
+                "lead_score": session.lead_score,
+                "handoff_reason": session.handoff_reason,
+                "followup_count": session.followup_count,
+                "last_activity_at": session.last_activity_at.isoformat() if session.last_activity_at else None,
+                # Dados do proprietário
+                "owner_property_type": session.owner_property_type,
+                "owner_neighborhood": session.owner_neighborhood,
+                "owner_value": session.owner_value,
+                "owner_availability": session.owner_availability,
+                "owner_step": session.owner_step,
             }
             serialized = json.dumps(data)
             await self.client.set(key, serialized, ex=self.ttl)

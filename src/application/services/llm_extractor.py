@@ -78,6 +78,7 @@ class LLMPreferenceExtractor(IPreferenceExtractor):
             '  "pet_friendly": boolean|null,\n'
             '  "garagem": boolean|null,\n'
             '  "mobiliado": boolean|null,\n'
+            '  "prazo_mudanca": "urgente"|"1 mes"|"3 meses"|"sem pressa"|null,\n'
             '  "nome_cliente": string|null,\n'
             '  "ponto_referencia": string|null\n'
             "}\n\n"
@@ -88,6 +89,8 @@ class LLMPreferenceExtractor(IPreferenceExtractor):
             "- Para 'tipo', padronize: se for kitnet/quitinete, retorne 'kitnet'. Se for casa, 'casa'. Se for apartamento/apto, 'apartamento'.\n"
             "- Se o cliente falar sobre aluguel, alugar, locar, retorne 'Locação' em 'finalidade'. Se falar sobre compra, comprar, venda, retorne 'Venda'.\n"
             "- 'valor_max' deve ser um número representando o limite de preço (ex: 'até R$ 1200' -> 1200.0, 'até 1.5 mil' -> 1500.0).\n"
+            "- 'quartos_min' deve ser o número mínimo de quartos desejado (ex: '2 quartos' -> 2, 'pelo menos 3 quartos' -> 3).\n"
+            "- 'prazo_mudanca': se o cliente mencionar urgência ('preciso já', 'para logo', 'semana que vem', 'urgente') retorne 'urgente'. Se falar em 1 mês retorne '1 mes'. Se falar em 2-3 meses retorne '3 meses'. Se sem pressa retorne 'sem pressa'.\n"
             "- Não invente informações. Se uma chave não estiver presente na mensagem ou histórico, retorne null."
         )
 
@@ -143,6 +146,20 @@ class LLMPreferenceExtractor(IPreferenceExtractor):
                     extracted["max_value"] = float(data["valor_max"])
                 except (ValueError, TypeError):
                     pass
+            # --- Campos avançados de qualificação (agora mapeados para a sessão) ---
+            if data.get("quartos_min") is not None:
+                try:
+                    extracted["bedrooms_min"] = int(data["quartos_min"])
+                except (ValueError, TypeError):
+                    pass
+            if data.get("garagem") is not None:
+                extracted["parking"] = bool(data["garagem"])
+            if data.get("pet_friendly") is not None:
+                extracted["pet_friendly"] = bool(data["pet_friendly"])
+            if data.get("mobiliado") is not None:
+                extracted["furnished"] = bool(data["mobiliado"])
+            if data.get("prazo_mudanca"):
+                extracted["move_deadline"] = data["prazo_mudanca"]
 
             return extracted
 

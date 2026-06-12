@@ -20,6 +20,7 @@ class PropertyListing:
         bedrooms: Optional[int] = None,
         bathrooms: Optional[int] = None,
         parking_spaces: Optional[int] = None,
+        area_m2: Optional[float] = None,
         description: Optional[str] = None,
         intent: Optional[str] = None,
         is_available: bool = True,
@@ -37,6 +38,7 @@ class PropertyListing:
         self.bedrooms = bedrooms
         self.bathrooms = bathrooms
         self.parking_spaces = parking_spaces
+        self.area_m2 = area_m2
         self.description = description
         self.intent = intent
         self.is_available = is_available
@@ -50,6 +52,8 @@ class PropertyListing:
         bedrooms: Optional[int] = None,
         bathrooms: Optional[int] = None,
         parking_spaces: Optional[int] = None,
+        parking: Optional[bool] = None,
+        pet_friendly: Optional[bool] = None,
     ) -> bool:
         """Verifica se o imóvel corresponde às preferências informadas."""
         # Filtra imóveis indisponíveis (vendidos ou alugados)
@@ -90,6 +94,17 @@ class PropertyListing:
         if parking_spaces is not None and (self.parking_spaces is None or self.parking_spaces < parking_spaces):
             return False
 
+        # Filtra por exigência de garagem (pelo menos 1 vaga)
+        if parking is True and (self.parking_spaces is None or self.parking_spaces < 1):
+            return False
+
+        # Filtra por pet friendly (verifica nas features do imóvel)
+        if pet_friendly is True:
+            features_lower = " ".join(self.features).lower() if self.features else ""
+            desc_lower = (self.description or "").lower()
+            if "pet" not in features_lower and "pet" not in desc_lower:
+                return False
+
         return True
 
     def to_dict(self) -> dict[str, Any]:
@@ -108,6 +123,7 @@ class PropertyListing:
             "bedrooms": self.bedrooms,
             "bathrooms": self.bathrooms,
             "parking_spaces": self.parking_spaces,
+            "area_m2": self.area_m2,
             "description": self.description,
             "intent": self.intent,
             "is_available": self.is_available,

@@ -21,12 +21,14 @@ def get_greeting() -> str:
 def get_welcome_first_time_phrase(bot_name: str, broker_name: str) -> str:
     """Frase aleatória para o primeiro contato/boas-vindas solicitando o nome."""
     greeting = get_greeting()
+    lgpd_note = "_Seus dados são usados apenas para seu atendimento, conforme nossa Política de Privacidade._"
     variations = [
-        f"{greeting}! 😊\n\nAqui é a {bot_name}, atendente virtual da {broker_name}.\n\nFico feliz em te atender! Para que eu possa te ajudar melhor, qual é o seu nome?",
-        f"{greeting}! Que bom ter você por aqui. 😊\n\nEu sou a {bot_name}, a assistente virtual da {broker_name}.\n\nPara que eu possa falar com você da melhor forma, me diz: qual o seu nome?",
-        f"{greeting}! Seja muito bem-vindo(a). 😊\n\nAqui quem fala é a {bot_name}, da {broker_name}.\n\nComo posso te chamar? Me conta seu nome para eu iniciar seu atendimento!",
+        f"{greeting}! 😊\n\nAqui é a {bot_name}, atendente virtual da {broker_name}.\n\nFico feliz em te atender! Para que eu possa te ajudar melhor, qual é o seu nome?\n\n{lgpd_note}",
+        f"{greeting}! Que bom ter você por aqui. 😊\n\nEu sou a {bot_name}, a assistente virtual da {broker_name}.\n\nPara que eu possa falar com você da melhor forma, me diz: qual o seu nome?\n\n{lgpd_note}",
+        f"{greeting}! Seja muito bem-vindo(a). 😊\n\nAqui quem fala é a {bot_name}, da {broker_name}.\n\nComo posso te chamar? Me conta seu nome para eu iniciar seu atendimento!\n\n{lgpd_note}",
     ]
     return random.choice(variations)
+
 
 def get_welcome_returning_phrase(client_name: str | None, bot_name: str, broker_name: str) -> str:
     """Frase aleatória para cliente que retorna."""
