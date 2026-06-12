@@ -12,8 +12,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Copy package specifications
+# Copy package specifications and source code
 COPY pyproject.toml ./
+COPY src/ ./src/
 
 # Install dependencies using pip
 RUN pip install --no-cache-dir --upgrade pip && \
