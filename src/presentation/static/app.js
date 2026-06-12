@@ -166,18 +166,33 @@ async function loadLogs() {
             return;
         }
 
+        const stepTranslations = {
+            'START': 'Início',
+            'INTENT': 'Intenção',
+            'PREFERENCES': 'Preferências',
+            'CONFIRM_CRITERIA': 'Confirmação',
+            'SEARCHING': 'Buscando',
+            'SHOWING': 'Resultados',
+            'DETAIL': 'Detalhes',
+            'FAQ': 'Dúvidas/FAQ',
+            'OWNER_ONBOARDING': 'Anunciar Imóvel',
+            'HANDOFF': 'Transf. Corretor',
+            'FAREWELL': 'Despedida'
+        };
+
         tableBody.innerHTML = logs.map(log => {
             const dateStr = new Date(log.created_at).toLocaleString('pt-BR');
             const directionBadge = log.direction === 'in' 
                 ? '<span class="badge badge-in">Recebida</span>' 
                 : '<span class="badge badge-out">Enviada</span>';
+            const stepTranslated = stepTranslations[log.step] || log.step;
             
             return `
                 <tr>
                     <td class="text-bold">${dateStr}</td>
                     <td>${log.phone}</td>
                     <td>${directionBadge}</td>
-                    <td>${log.step}</td>
+                    <td>${stepTranslated}</td>
                     <td>${log.intent || '-'}</td>
                     <td>${escapeHtml(log.text)}</td>
                 </tr>
