@@ -37,9 +37,6 @@ body {
     color: var(--text-primary);
     min-height: 100vh;
     overflow-x: hidden;
-    display: flex;
-    justify-content: center;
-    align-items: center;
 }
 
 /* Efeito Glows de Fundo */
@@ -878,5 +875,23 @@ tr:hover td {
 .toast-notification.show {
     opacity: 1;
     transform: translateY(0);
+}
+
+/* Login centring wrapper */
+.login-wrapper {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    display: none;
+    justify-content: center;
+    align-items: center;
+    background-color: var(--bg-dark);
+    z-index: 999;
+}
+
+.login-wrapper.active {
+    display: flex;
 }
 

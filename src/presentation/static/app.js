@@ -382,6 +382,8 @@ function setupForms() {
     document.getElementById('btn-apply-prop-filters').addEventListener('click', loadProperties);
     document.getElementById('property-scraper-form').addEventListener('submit', runPropertyScraper);
     document.getElementById('btn-new-property').addEventListener('click', openPropertyAddModal);
+    document.getElementById('btn-new-property-top').addEventListener('click', openPropertyAddModal);
+    document.getElementById('btn-sync-all').addEventListener('click', runBatchPropertyScraper);
     
     document.getElementById('btn-close-property-modal').addEventListener('click', closePropertyModal);
     document.getElementById('btn-close-property-form').addEventListener('click', closePropertyModal);
@@ -417,6 +419,7 @@ async function loadProperties() {
     const neighborhood = document.getElementById('prop-filter-neighborhood').value.trim();
     const minPrice = document.getElementById('prop-filter-min-price').value;
     const maxPrice = document.getElementById('prop-filter-max-price').value;
+    const available = document.getElementById('prop-filter-available').value;
 
     let url = `${API_BASE}/properties?`;
     if (intent) url += `&intent=${encodeURIComponent(intent)}`;
@@ -427,6 +430,7 @@ async function loadProperties() {
     if (neighborhood) url += `&neighborhood=${encodeURIComponent(neighborhood)}`;
     if (minPrice) url += `&min_price=${minPrice}`;
     if (maxPrice) url += `&max_price=${maxPrice}`;
+    if (available !== '') url += `&is_available=${available}`;
 
     try {
         const response = await fetchAuth(url);
@@ -454,6 +458,10 @@ async function loadProperties() {
             const photoUrl = p.photos && p.photos.length > 0 ? p.photos[0] : '';
             const imgHtml = photoUrl ? `<img class="prop-image-thumb" src="${escapeHtml(photoUrl)}" alt="Foto">` : '<div class="prop-image-thumb text-center" style="display:flex;align-items:center;justify-content:center;font-size:1.5rem;">🏡</div>';
 
+            const statusBadge = p.is_available 
+                ? '<span class="badge badge-in" style="background: rgba(16,185,129,0.1); color:#10b981; border: 1px solid rgba(16,185,129,0.2); margin-top:4px; font-size:0.65rem; padding: 2px 6px;">Disponível</span>' 
+                : '<span class="badge badge-out" style="background: rgba(239,68,68,0.1); color:#ef4444; border: 1px solid rgba(239,68,68,0.2); margin-top:4px; font-size:0.65rem; padding: 2px 6px;">Indisponível</span>';
+
             return `
                 <tr>
                     <td>
@@ -461,6 +469,7 @@ async function loadProperties() {
                             ${imgHtml}
                             <div>
                                 <span class="text-bold">${escapeHtml(p.ref || 'S/Ref')}</span><br>
+                                ${statusBadge}<br>
                                 <span class="text-muted" style="font-size:0.75rem;">ID: ${escapeHtml(p.id)}</span>
                             </div>
                         </div>
@@ -512,6 +521,7 @@ function clearPropertyFilters() {
     document.getElementById('prop-filter-neighborhood').value = '';
     document.getElementById('prop-filter-min-price').value = '';
     document.getElementById('prop-filter-max-price').value = '';
+    document.getElementById('prop-filter-available').value = '';
     loadProperties();
 }
 
@@ -559,6 +569,39 @@ async function runPropertyScraper(e) {
     }
 }
 
+async function runBatchPropertyScraper() {
+    const btn = document.getElementById('btn-sync-all');
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '🔄 Sincronizando todos...';
+    
+    const statusBox = document.getElementById('scraper-status');
+    statusBox.className = 'scraper-status-box info show';
+    statusBox.innerHTML = `<span>⏳ Iniciando raspagem completa do site de imóveis... Isso pode levar de 10 a 20 segundos devido ao delay de segurança.</span>`;
+    
+    try {
+        const response = await fetchAuth(`${API_BASE}/properties/scrape-all`, {
+            method: 'POST'
+        });
+        
+        if (!response.ok) {
+            const errData = await response.json();
+            throw new Error(errData.detail || 'Erro na resposta do servidor');
+        }
+        
+        const data = await response.json();
+        statusBox.className = 'scraper-status-box success show';
+        statusBox.innerHTML = `<span>✅ Sucesso! Sincronizados ${data.total_scraped} imóveis do site Exata Serviços no banco de dados.</span>`;
+        loadProperties();
+    } catch (err) {
+        statusBox.className = 'scraper-status-box error show';
+        statusBox.innerHTML = `<span>❌ Erro na sincronização geral: ${err.message}</span>`;
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
+}
+
 const propertyModal = document.getElementById('property-modal');
 
 window.openPropertyEditModal = function(p) {
@@ -570,6 +613,7 @@ window.openPropertyEditModal = function(p) {
     document.getElementById('property-modal-type').value = p.property_type || 'Casa';
     document.getElementById('property-modal-intent').value = p.intent || 'Locação';
     document.getElementById('property-modal-value').value = p.value || 0;
+    document.getElementById('property-modal-available').value = p.is_available !== false ? 'true' : 'false';
     document.getElementById('property-modal-fees').value = p.fees || 0;
     document.getElementById('property-modal-url').value = p.url || '';
     document.getElementById('property-modal-address').value = p.address || '';
@@ -594,6 +638,7 @@ window.openPropertyAddModal = function() {
     document.getElementById('property-modal-intent').value = 'Locação';
     document.getElementById('property-modal-value').value = '';
     document.getElementById('property-modal-fees').value = '';
+    document.getElementById('property-modal-available').value = 'true';
     document.getElementById('property-modal-url').value = '';
     document.getElementById('property-modal-address').value = '';
     document.getElementById('property-modal-neighborhood').value = '';
@@ -620,6 +665,7 @@ async function savePropertyForm(e) {
     const intent = document.getElementById('property-modal-intent').value;
     const value = parseFloat(document.getElementById('property-modal-value').value) || 0;
     const fees = parseFloat(document.getElementById('property-modal-fees').value) || 0;
+    const availableVal = document.getElementById('property-modal-available').value;
     const url = document.getElementById('property-modal-url').value.trim();
     const address = document.getElementById('property-modal-address').value.trim();
     const neighborhood = document.getElementById('property-modal-neighborhood').value.trim();
@@ -641,6 +687,7 @@ async function savePropertyForm(e) {
         intent: intent,
         value: value,
         fees: fees,
+        is_available: availableVal === 'true',
         url: url,
         address: address,
         neighborhood: neighborhood,

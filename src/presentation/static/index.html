@@ -17,24 +17,26 @@
         <div class="glow-circle glow-2"></div>
     </div>
 
-    <!-- Login Card -->
-    <div id="login-container" class="glass-card login-card active">
-        <div class="card-header">
-            <h2>ExataBot</h2>
-            <p>Faça login para acessar o painel de controle</p>
+    <!-- Login Wrapper (to center the card) -->
+    <div id="login-container" class="login-wrapper active">
+        <div class="glass-card login-card">
+            <div class="card-header">
+                <h2>ExataBot</h2>
+                <p>Faça login para acessar o painel de controle</p>
+            </div>
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="username">Usuário</label>
+                    <input type="text" id="username" required placeholder="Digite o usuário de admin">
+                </div>
+                <div class="form-group">
+                    <label for="password">Senha</label>
+                    <input type="password" id="password" required placeholder="Digite a senha">
+                </div>
+                <button type="submit" class="btn btn-primary">Entrar no Painel</button>
+                <p id="login-error" class="error-text"></p>
+            </form>
         </div>
-        <form id="login-form">
-            <div class="form-group">
-                <label for="username">Usuário</label>
-                <input type="text" id="username" required placeholder="Digite o usuário de admin">
-            </div>
-            <div class="form-group">
-                <label for="password">Senha</label>
-                <input type="password" id="password" required placeholder="Digite a senha">
-            </div>
-            <button type="submit" class="btn btn-primary">Entrar no Painel</button>
-            <p id="login-error" class="error-text"></p>
-        </form>
     </div>
 
     <!-- Dashboard App -->
@@ -271,6 +273,14 @@
                                 <label for="prop-filter-max-price">Valor Máximo (R$)</label>
                                 <input type="number" id="prop-filter-max-price" placeholder="Máx">
                             </div>
+                            <div class="filter-group">
+                                <label for="prop-filter-available">Disponibilidade</label>
+                                <select id="prop-filter-available">
+                                    <option value="">Todos</option>
+                                    <option value="true">Disponíveis</option>
+                                    <option value="false">Vendidos/Alugados</option>
+                                </select>
+                            </div>
                         </div>
                         <div class="filter-actions">
                             <button id="btn-clear-prop-filters" class="btn btn-secondary">Limpar Filtros</button>
@@ -292,8 +302,9 @@
                             </div>
                             <div id="scraper-status" class="scraper-status-box"></div>
                         </form>
-                        <div class="manual-creation-info">
+                        <div class="manual-creation-info" style="display: flex; gap: 10px; flex-direction: column;">
                             <button id="btn-new-property" class="btn btn-secondary btn-full">Cadastrar Imóvel Manualmente</button>
+                            <button id="btn-sync-all" class="btn btn-primary btn-full" style="background: var(--primary-color);">🔄 Buscar Todos do Site</button>
                         </div>
                     </div>
                 </div>
@@ -302,7 +313,10 @@
                 <div class="glass-card table-card">
                     <div class="card-header-actions">
                         <h3>Imóveis Cadastrados</h3>
-                        <button id="btn-refresh-properties" class="btn btn-secondary btn-sm">Atualizar Lista</button>
+                        <div style="display: flex; gap: 10px;">
+                            <button id="btn-new-property-top" class="btn btn-primary btn-sm">➕ Novo Imóvel</button>
+                            <button id="btn-refresh-properties" class="btn btn-secondary btn-sm">Atualizar Lista</button>
+                        </div>
                     </div>
                     <div class="table-wrapper">
                         <table>
@@ -374,9 +388,16 @@
                         <input type="number" step="0.01" id="property-modal-fees" placeholder="Ex: 80.00">
                     </div>
                     <div class="form-group">
-                        <label for="property-modal-url">URL Site</label>
-                        <input type="url" id="property-modal-url" placeholder="Ex: https://...">
+                        <label for="property-modal-available">Status / Disponibilidade</label>
+                        <select id="property-modal-available" required>
+                            <option value="true">Disponível</option>
+                            <option value="false">Vendido / Alugado</option>
+                        </select>
                     </div>
+                </div>
+                <div class="form-group">
+                    <label for="property-modal-url">URL Site</label>
+                    <input type="url" id="property-modal-url" placeholder="Ex: https://...">
                 </div>
                 <div class="form-group">
                     <label for="property-modal-address">Endereço Completo</label>

@@ -254,6 +254,7 @@ class ExataPropertyRepository(IPropertyRepository):
                 existing.description = model.description
                 existing.photos = model.photos
                 existing.intent = model.intent
+                existing.is_available = model.is_available
                 session.add(existing)
             else:
                 session.add(model)
@@ -280,6 +281,7 @@ class ExataPropertyRepository(IPropertyRepository):
         neighborhood: Optional[str] = None,
         intent: Optional[str] = None,
         ref: Optional[str] = None,
+        is_available: Optional[bool] = None,
     ) -> list[PropertyListing]:
         """Lista imóveis no banco de dados aplicando os filtros fornecidos."""
         if not self.engine:
@@ -305,6 +307,8 @@ class ExataPropertyRepository(IPropertyRepository):
                 statement = statement.where(Properties.intent.ilike(f"%{intent}%"))
             if ref:
                 statement = statement.where(Properties.ref.ilike(f"%{ref}%"))
+            if is_available is not None:
+                statement = statement.where(Properties.is_available == is_available)
 
             statement = statement.order_by(Properties.created_at.desc())
             result = await session.execute(statement)

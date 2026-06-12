@@ -22,6 +22,7 @@ class PropertyListing:
         parking_spaces: Optional[int] = None,
         description: Optional[str] = None,
         intent: Optional[str] = None,
+        is_available: bool = True,
     ) -> None:
         self.id = property_id
         self.ref = ref
@@ -38,6 +39,7 @@ class PropertyListing:
         self.parking_spaces = parking_spaces
         self.description = description
         self.intent = intent
+        self.is_available = is_available
 
     def matches_preferences(
         self,
@@ -50,6 +52,10 @@ class PropertyListing:
         parking_spaces: Optional[int] = None,
     ) -> bool:
         """Verifica se o imóvel corresponde às preferências informadas."""
+        # Filtra imóveis indisponíveis (vendidos ou alugados)
+        if not self.is_available:
+            return False
+
         # Filtra por valor máximo se informado
         if max_value is not None and self.value.amount > max_value:
             return False
@@ -104,4 +110,5 @@ class PropertyListing:
             "parking_spaces": self.parking_spaces,
             "description": self.description,
             "intent": self.intent,
+            "is_available": self.is_available,
         }

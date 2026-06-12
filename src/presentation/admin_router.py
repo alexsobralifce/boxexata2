@@ -198,6 +198,7 @@ class PropertySave(BaseModel):
     description: Optional[str] = Field(default=None)
     photos: list[str] = Field(default_factory=list)
     intent: Optional[str] = Field(default="Locação")
+    is_available: bool = Field(default=True, description="Disponibilidade")
 
 
 class ScrapeRequest(BaseModel):
@@ -215,6 +216,7 @@ async def list_properties(
     neighborhood: Optional[str] = None,
     intent: Optional[str] = None,
     ref: Optional[str] = None,
+    is_available: Optional[bool] = None,
     _: str = Depends(get_current_admin),
 ) -> list[dict[str, Any]]:
     """Lista os imóveis armazenados no banco de dados com suporte a filtros avançados."""
@@ -263,6 +265,7 @@ async def list_properties(
         neighborhood=neighborhood,
         intent=intent,
         ref=ref,
+        is_available=is_available,
     )
     return [p.to_dict() for p in properties]
 
@@ -289,6 +292,45 @@ async def scrape_property_by_ref(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erro ao executar scraper: {e}",
+        )
+
+
+@router.post("/properties/scrape-all", response_model=dict[str, Any])
+async def scrape_all_properties(
+    _: str = Depends(get_current_admin),
+) -> dict[str, Any]:
+    """Faz o scrape detalhado de todos os imóveis atualmente listados no site Exata Serviços."""
+    container = get_container()
+    property_repo = container["property_repo"]
+
+    try:
+        logger.info("Iniciando raspagem completa de todos os imóveis do site")
+        basics = await property_repo._scrape_all_basic_listings()
+        total_scraped = 0
+        scraped_refs = []
+        
+        for pid, basic in basics.items():
+            try:
+                # Realiza scrape completo do detalhe e salva no banco
+                url = f"{property_repo.site_base_url}/detalhe_imovel.php?codigo={pid}"
+                html = await property_repo._fetch_html(url)
+                listing = await property_repo._parse_detail_html(pid, html, basic)
+                if listing:
+                    await property_repo.save(listing)
+                    total_scraped += 1
+                    scraped_refs.append(listing.ref)
+                    # Limpa cache do detalhe
+                    cache_key = f"property_detail_{pid}"
+                    await property_repo.cache.delete(cache_key)
+            except Exception as ex:
+                logger.error("Falha ao raspar detalhes do imóvel individual na carga total", pid=pid, error=str(ex))
+                
+        return {"status": "success", "total_scraped": total_scraped, "scraped_refs": scraped_refs}
+    except Exception as e:
+        logger.error("Erro geral na raspagem de todos os imóveis", error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao executar raspagem geral: {e}",
         )
 
 
@@ -320,7 +362,8 @@ async def save_or_update_property(
         bathrooms=data.bathrooms,
         parking_spaces=data.parking_spaces,
         description=data.description,
-        intent=data.intent
+        intent=data.intent,
+        is_available=data.is_available,
     )
 
     await property_repo.save(listing)

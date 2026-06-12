@@ -105,6 +105,7 @@ class Properties(SQLModel, table=True):
     description: Optional[str] = Field(default=None, nullable=True)
     photos: str = Field(default="[]")  # Armazenado como string JSON
     intent: Optional[str] = Field(default=None, nullable=True)
+    is_available: bool = Field(default=True, index=True)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None), index=True)
 
     @classmethod
@@ -126,6 +127,7 @@ class Properties(SQLModel, table=True):
             description=entity.description,
             photos=json.dumps(entity.photos or []),
             intent=entity.intent,
+            is_available=entity.is_available,
             created_at=created_at_naive,
         )
 
@@ -151,4 +153,5 @@ class Properties(SQLModel, table=True):
             parking_spaces=self.parking_spaces,
             description=self.description,
             intent=self.intent,
+            is_available=self.is_available,
         )
