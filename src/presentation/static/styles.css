@@ -114,7 +114,7 @@ body {
     transition: transform var(--transition-normal), opacity var(--transition-normal);
 }
 
-.login-card.active {
+.login-wrapper.active .login-card {
     display: block;
     transform: scale(1);
     opacity: 1;
