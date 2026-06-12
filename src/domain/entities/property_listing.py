@@ -17,6 +17,11 @@ class PropertyListing:
         fees: Optional[Money] = None,
         features: Optional[list[str]] = None,
         photos: Optional[list[str]] = None,
+        bedrooms: Optional[int] = None,
+        bathrooms: Optional[int] = None,
+        parking_spaces: Optional[int] = None,
+        description: Optional[str] = None,
+        intent: Optional[str] = None,
     ) -> None:
         self.id = property_id
         self.ref = ref
@@ -28,6 +33,11 @@ class PropertyListing:
         self.fees = fees
         self.features = features if features is not None else []
         self.photos = photos if photos is not None else []
+        self.bedrooms = bedrooms
+        self.bathrooms = bathrooms
+        self.parking_spaces = parking_spaces
+        self.description = description
+        self.intent = intent
 
     def matches_preferences(
         self,
@@ -35,6 +45,9 @@ class PropertyListing:
         property_type: Optional[str] = None,
         neighborhood: Optional[str] = None,
         max_value: Optional[float] = None,
+        bedrooms: Optional[int] = None,
+        bathrooms: Optional[int] = None,
+        parking_spaces: Optional[int] = None,
     ) -> bool:
         """Verifica se o imóvel corresponde às preferências informadas."""
         # Filtra por valor máximo se informado
@@ -50,9 +63,26 @@ class PropertyListing:
         # Filtra por tipo (ex: casa, apartamento)
         if property_type is not None:
             clean_type = property_type.strip().lower()
-            # O tipo do anúncio pode ser "Apartamento", "Casa residencial", etc.
             if clean_type not in self.property_type.lower():
                 return False
+
+        # Filtra por finalidade (intent)
+        if intent is not None and self.intent is not None:
+            clean_intent = intent.strip().lower()
+            if clean_intent not in self.intent.lower():
+                return False
+
+        # Filtra por quartos mínimos
+        if bedrooms is not None and (self.bedrooms is None or self.bedrooms < bedrooms):
+            return False
+
+        # Filtra por banheiros mínimos
+        if bathrooms is not None and (self.bathrooms is None or self.bathrooms < bathrooms):
+            return False
+
+        # Filtra por vagas de garagem mínimas
+        if parking_spaces is not None and (self.parking_spaces is None or self.parking_spaces < parking_spaces):
+            return False
 
         return True
 
@@ -69,4 +99,9 @@ class PropertyListing:
             "fees": self.fees.amount if self.fees else 0.0,
             "features": self.features,
             "photos": self.photos,
+            "bedrooms": self.bedrooms,
+            "bathrooms": self.bathrooms,
+            "parking_spaces": self.parking_spaces,
+            "description": self.description,
+            "intent": self.intent,
         }

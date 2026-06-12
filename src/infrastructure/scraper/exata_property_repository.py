@@ -3,6 +3,10 @@ import time
 from typing import Any, Optional, cast
 from bs4 import BeautifulSoup
 import httpx
+import re
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
+from sqlmodel import select
+from src.infrastructure.persistence.models import Properties
 
 from src.domain.entities.property_listing import PropertyListing
 from src.domain.entities.session import Session
@@ -31,16 +35,19 @@ class RateLimiter:
             self.last_request_time = time.time()
 
 
+
 class ExataPropertyRepository(IPropertyRepository):
-    """Implementação concreta de scraping para recuperar imóveis do site Exata Serviços."""
+    """Implementação de scraping para recuperar imóveis com persistência em banco de dados."""
 
     def __init__(
         self,
         cache: Optional[Any] = None,
         rate_limiter: Optional[RateLimiter] = None,
+        engine: Optional[AsyncEngine] = None,
     ) -> None:
         self.cache = cache or MemoryCache(default_ttl_seconds=settings.cache_ttl_minutes * 60)
         self.rate_limiter = rate_limiter or RateLimiter(min_delay_seconds=1.0)
+        self.engine = engine
         self.headers = {
             "User-Agent": (
                 "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -107,13 +114,10 @@ class ExataPropertyRepository(IPropertyRepository):
             return 0.0
 
         if "." in val_str and "," in val_str:
-            # Padrão brasileiro: 1.250,50 -> 1250.50
             clean = val_str.replace(".", "").replace(",", ".")
         elif "," in val_str:
-            # e.g., 800,00 -> 800.00
             clean = val_str.replace(",", ".")
         elif "." in val_str:
-            # e.g., 750.00 ou 1500.00 ou 1.500
             parts = val_str.split(".")
             if len(parts[-1]) == 2:
                 clean = val_str
@@ -135,7 +139,6 @@ class ExataPropertyRepository(IPropertyRepository):
         async with httpx.AsyncClient(headers=self.headers, timeout=self.timeout) as client:
             response = await client.get(url)
             response.raise_for_status()
-            # O site usa codificação ISO-8859-1 (Latin1) frequentemente
             content_type = response.headers.get("content-type", "").lower()
             if "utf-8" not in content_type:
                 response.encoding = "iso-8859-1"
@@ -176,7 +179,6 @@ class ExataPropertyRepository(IPropertyRepository):
             if cover_image and not cover_image.startswith("http"):
                 cover_image = f"{self.site_base_url}/{cover_image}"
 
-            # Parsing text-based key-values inside the mold box
             text_parts = div.get_text("|", strip=True).split("|")
             parts = [p.strip() for p in text_parts if p.strip()]
 
@@ -185,35 +187,13 @@ class ExataPropertyRepository(IPropertyRepository):
             while i < len(parts):
                 part = parts[i]
                 part_clean = part.rstrip(":").lower()
-                # Verifica se a parte é uma palavra-chave de metadados
                 if part.endswith(":") or part_clean in (
-                    "tipo",
-                    "finalidade",
-                    "codigo",
-                    "código",
-                    "ref",
-                    "ref.",
-                    "endereço",
-                    "endereco",
-                    "bairro",
-                    "valor",
+                    "tipo", "finalidade", "codigo", "código", "ref", "ref.", "endereço", "endereco", "bairro", "valor"
                 ):
                     key = part_clean
-                    # Apenas associa se o próximo item não for outra chave
                     if i + 1 < len(parts) and not (
-                        parts[i + 1].endswith(":")
-                        or parts[i + 1].rstrip(":").lower()
-                        in (
-                            "tipo",
-                            "finalidade",
-                            "codigo",
-                            "código",
-                            "ref",
-                            "ref.",
-                            "endereço",
-                            "endereco",
-                            "bairro",
-                            "valor",
+                        parts[i + 1].endswith(":") or parts[i + 1].rstrip(":").lower() in (
+                            "tipo", "finalidade", "codigo", "código", "ref", "ref.", "endereço", "endereco", "bairro", "valor"
                         )
                     ):
                         kv_map[key] = parts[i + 1]
@@ -229,13 +209,7 @@ class ExataPropertyRepository(IPropertyRepository):
                     i += 1
 
             intent = kv_map.get("tipo") or kv_map.get("finalidade") or ""
-            ref = (
-                kv_map.get("código")
-                or kv_map.get("codigo")
-                or kv_map.get("ref")
-                or kv_map.get("ref.")
-                or ""
-            )
+            ref = kv_map.get("código") or kv_map.get("codigo") or kv_map.get("ref") or kv_map.get("ref.") or ""
             address = kv_map.get("endereço") or kv_map.get("endereco") or ""
             neighborhood = kv_map.get("bairro") or ""
             price_val = self._parse_price(kv_map.get("valor", "0.0"))
@@ -254,8 +228,90 @@ class ExataPropertyRepository(IPropertyRepository):
         await self.cache.set(cache_key, listings)
         return listings
 
+    # --- Database operations ---
+
+    async def save(self, property: PropertyListing) -> None:
+        """Persiste ou atualiza o imóvel no banco de dados."""
+        if not self.engine:
+            return
+        model = Properties.from_entity(property)
+        async with AsyncSession(self.engine) as session:
+            existing = await session.get(Properties, property.id)
+            if existing:
+                existing.ref = model.ref
+                existing.property_type = model.property_type
+                existing.address = model.address
+                existing.neighborhood = model.neighborhood
+                existing.value = model.value
+                existing.url = model.url
+                existing.fees = model.fees
+                existing.bedrooms = model.bedrooms
+                existing.bathrooms = model.bathrooms
+                existing.parking_spaces = model.parking_spaces
+                existing.description = model.description
+                existing.photos = model.photos
+                existing.intent = model.intent
+                session.add(existing)
+            else:
+                session.add(model)
+            await session.commit()
+
+    async def delete(self, property_id: str) -> None:
+        """Remove um imóvel do banco de dados."""
+        if not self.engine:
+            return
+        async with AsyncSession(self.engine) as session:
+            existing = await session.get(Properties, property_id)
+            if existing:
+                await session.delete(existing)
+                await session.commit()
+
+    async def list_stored_properties(
+        self,
+        property_type: Optional[str] = None,
+        bedrooms: Optional[int] = None,
+        bathrooms: Optional[int] = None,
+        parking_spaces: Optional[int] = None,
+        min_price: Optional[float] = None,
+        max_price: Optional[float] = None,
+        neighborhood: Optional[str] = None,
+        intent: Optional[str] = None,
+        ref: Optional[str] = None,
+    ) -> list[PropertyListing]:
+        """Lista imóveis no banco de dados aplicando os filtros fornecidos."""
+        if not self.engine:
+            return []
+
+        async with AsyncSession(self.engine) as session:
+            statement = select(Properties)
+            if property_type:
+                statement = statement.where(Properties.property_type.ilike(f"%{property_type}%"))
+            if bedrooms is not None:
+                statement = statement.where(Properties.bedrooms >= bedrooms)
+            if bathrooms is not None:
+                statement = statement.where(Properties.bathrooms >= bathrooms)
+            if parking_spaces is not None:
+                statement = statement.where(Properties.parking_spaces >= parking_spaces)
+            if min_price is not None:
+                statement = statement.where(Properties.value >= min_price)
+            if max_price is not None:
+                statement = statement.where(Properties.value <= max_price)
+            if neighborhood:
+                statement = statement.where(Properties.neighborhood.ilike(f"%{neighborhood}%"))
+            if intent:
+                statement = statement.where(Properties.intent.ilike(f"%{intent}%"))
+            if ref:
+                statement = statement.where(Properties.ref.ilike(f"%{ref}%"))
+
+            statement = statement.order_by(Properties.created_at.desc())
+            result = await session.execute(statement)
+            models = result.scalars().all()
+            return [m.to_entity() for m in models]
+
+    # --- Main Interface Implementations ---
+
     async def find_by_preferences(self, session: Session) -> list[PropertyListing]:
-        """Busca imóveis no site com base nas preferências coletadas."""
+        """Busca imóveis com base nas preferências, integrando dados do site com o banco."""
         logger.info(
             "Iniciando busca de imóveis por preferências",
             intent=session.intent,
@@ -264,13 +320,10 @@ class ExataPropertyRepository(IPropertyRepository):
             max_value=session.max_value,
         )
 
-        # 1. Carrega todos os anúncios básicos para ter preço e dados gerais
         all_basics = await self._scrape_all_basic_listings()
-
         tipo_codigo = self._map_property_type_to_code(session.property_type)
         filtered_ids: Optional[set[str]] = None
 
-        # 2. Se o tipo do imóvel for especificado e mapeável, filtra pelos IDs desse tipo
         if tipo_codigo is not None:
             cache_key = f"listings_type_{tipo_codigo}"
             cached_ids = await self.cache.get(cache_key)
@@ -295,52 +348,40 @@ class ExataPropertyRepository(IPropertyRepository):
                     await self.cache.set(cache_key, current_ids)
                     filtered_ids = current_ids
                 except Exception as e:
-                    logger.error(
-                        "Erro ao buscar filtragem por tipo de imóvel",
-                        code=tipo_codigo,
-                        error=str(e),
-                    )
+                    logger.error("Erro ao buscar filtragem por tipo de imóvel", code=tipo_codigo, error=str(e))
                     filtered_ids = None
 
-        # 3. Monta a lista final combinando as duas fontes de dados
         results: list[PropertyListing] = []
         for pid, basic in all_basics.items():
-            # Se filtramos por tipo, ignorar se não pertencer aos IDs filtrados
             if filtered_ids is not None and pid not in filtered_ids:
                 continue
 
-            # Determina o tipo descritivo
-            prop_type = (
-                self._map_code_to_property_type(tipo_codigo)
-                if tipo_codigo is not None
-                else "Imóvel"
-            )
+            prop_type = self._map_code_to_property_type(tipo_codigo) if tipo_codigo is not None else "Imóvel"
 
-            # Filtros adicionais no repositório (além do matches_preferences do domínio)
-            # Filtro de finalidade (Locação ou Venda)
             if session.intent:
                 clean_intent = session.intent.strip().lower()
-                # O intent do anúncio pode ser "Locação" ou "Venda"
                 if clean_intent not in basic["intent"].lower():
                     continue
 
-            # Pula anúncios incompletos (sem preço ou sem endereço)
             if basic["price"] <= 0 or not basic["address"].strip():
                 continue
 
-            # Constrói entidade básica
-            listing = PropertyListing(
-                property_id=pid,
-                ref=basic["ref"],
-                property_type=prop_type,
-                address=basic["address"],
-                neighborhood=basic["neighborhood"],
-                value=Money(basic["price"]),
-                url=basic["url"],
-                photos=[basic["cover_image"]] if basic["cover_image"] else [],
-            )
+            detailed = await self.find_by_id(pid)
+            if detailed:
+                listing = detailed
+            else:
+                listing = PropertyListing(
+                    property_id=pid,
+                    ref=basic["ref"],
+                    property_type=prop_type,
+                    address=basic["address"],
+                    neighborhood=basic["neighborhood"],
+                    value=Money(basic["price"]),
+                    url=basic["url"],
+                    photos=[basic["cover_image"]] if basic["cover_image"] else [],
+                    intent=basic["intent"],
+                )
 
-            # Aplica validação de preferências do domínio (bairro, tipo_imovel, max_value)
             if listing.matches_preferences(
                 intent=session.intent,
                 property_type=session.property_type,
@@ -353,14 +394,22 @@ class ExataPropertyRepository(IPropertyRepository):
         return results
 
     async def find_by_id(self, property_id: str) -> Optional[PropertyListing]:
-        """Busca informações detalhadas de um imóvel pelo seu ID, com suporte a cache."""
+        """Busca informações detalhadas de um imóvel pelo seu ID, checando banco primeiro."""
         cache_key = f"property_detail_{property_id}"
         cached = await self.cache.get(cache_key)
         if cached is not None:
             logger.info("Recuperando imóvel detalhado do cache", id=property_id)
             return cast(Optional[PropertyListing], cached)
 
-        # Busca informações básicas primeiro para manter consistência (valor, tipo, cover photo)
+        if self.engine:
+            async with AsyncSession(self.engine) as db_session:
+                model = await db_session.get(Properties, property_id)
+                if model and model.description:
+                    logger.info("Recuperando imóvel detalhado do banco de dados", id=property_id)
+                    entity = model.to_entity()
+                    await self.cache.set(cache_key, entity)
+                    return entity
+
         all_basics = await self._scrape_all_basic_listings()
         basic = all_basics.get(property_id)
 
@@ -371,8 +420,166 @@ class ExataPropertyRepository(IPropertyRepository):
             logger.error("Erro ao carregar detalhes do imóvel", id=property_id, error=str(e))
             return None
 
-        soup = BeautifulSoup(html, "html.parser")
+        listing = await self._parse_detail_html(property_id, html, basic)
+        if listing:
+            await self.save(listing)
+            await self.cache.set(cache_key, listing)
+            return listing
 
+        return None
+
+    # --- Scraper Helpers ---
+
+    def _clean_text(self, text: str) -> str:
+        if not text:
+            return ""
+        text = re.sub(r'<[^>]*>', '', text)
+        replacements = {
+            "&nbsp;": " ",
+            "&oacute;": "ó",
+            "&ccdil;": "ç",
+            "&ccedil;": "ç",
+            "&atilde;": "ã",
+            "&eacute;": "é",
+            "&iacute;": "í",
+            "&uacute;": "ú",
+            "&acirc;": "â",
+            "&otilde;": "õ",
+            "&Acirc;": "Â",
+            "&Ocirc;": "Ô",
+            "&ocirc;": "ô"
+        }
+        for entity, val in replacements.items():
+            text = text.replace(entity, val)
+        return text.strip().rstrip(";").rstrip(".")
+
+    def _extract_description_lines(self, html: str) -> list[str]:
+        lines = []
+        li_matches = re.findall(r'<li[^>]*>([\s\S]*?)<\/li>', html, re.IGNORECASE)
+        for match in li_matches:
+            txt = self._clean_text(match)
+            if txt and txt not in lines:
+                lines.append(txt)
+                
+        div_matches = re.findall(r'<div[^>]*>([\s\S]*?)<\/div>', html, re.IGNORECASE)
+        for match in div_matches:
+            txt = self._clean_text(match)
+            if txt and "fancybox" not in txt and "agendar.php" not in txt and not txt.startswith("<"):
+                if txt not in lines:
+                    lines.append(txt)
+                    
+        if not lines:
+            br_lines = re.split(r'<br\s*\/?>', html, flags=re.IGNORECASE)
+            for line in br_lines:
+                txt = self._clean_text(line)
+                if txt and txt not in lines:
+                    lines.append(txt)
+                    
+        return [line for line in lines if line]
+
+    def _parse_features_from_text(self, description: str) -> dict[str, Optional[int]]:
+        bedrooms = None
+        bathrooms = None
+        parking_spaces = None
+
+        lines = [line.strip() for line in description.split("\n") if line.strip()]
+        suite_count = 0
+        social_bath_count = 0
+
+        for line in lines:
+            clean_line = line.lower()
+            
+            bed_match = re.search(r'(\d+)\s*(?:quarto|dormitorio)', clean_line)
+            if bed_match and bedrooms is None:
+                bedrooms = int(bed_match.group(1))
+
+            suite_bed_match = re.search(r'(\d+)\s*(?:suíte|suite)', clean_line)
+            if suite_bed_match:
+                num_suites = int(suite_bed_match.group(1))
+                suite_count += num_suites
+                if bedrooms is None:
+                    bedrooms = num_suites
+            elif "suíte" in clean_line or "suite" in clean_line:
+                suite_count += 1
+                if bedrooms is None:
+                    bedrooms = 1
+
+            bath_match = re.search(r'(\d+)\s*(?:banheiro|wc|sanitario)', clean_line)
+            if bath_match:
+                social_bath_count += int(bath_match.group(1))
+            elif "banheiro" in clean_line or "wc" in clean_line or "sanitario" in clean_line:
+                social_bath_count += 1
+
+            park_match = re.search(r'(?:garagem\s*p\/\s*|vagas?\s*p\/\s*|vagas?\s*de\s*garagem\s*p\/\s*|garagem\s*para\s*)(\d+)', clean_line) or \
+                         re.search(r'(\d+)\s*(?:vagas?\s*de\s*garagem|vagas?\s*na\s*garagem|garagens?)', clean_line)
+            if park_match and parking_spaces is None:
+                parking_spaces = int(park_match.group(1))
+            elif "garagem" in clean_line or "vaga de garagem" in clean_line:
+                if parking_spaces is None:
+                    parking_spaces = 1
+
+        if suite_count > 0 or social_bath_count > 0:
+            bathrooms = max(social_bath_count, suite_count)
+            has_explicit_suite = any("suíte" in line.lower() or "suite" in line.lower() for line in lines)
+            has_explicit_social = any(("banheiro" in line.lower() or "wc" in line.lower() or "sanitario" in line.lower()) and not ("suíte" in line.lower() or "suite" in line.lower()) for line in lines)
+            if has_explicit_suite and has_explicit_social:
+                bathrooms = suite_count + social_bath_count
+
+        return {
+            "bedrooms": bedrooms,
+            "bathrooms": bathrooms,
+            "parking_spaces": parking_spaces
+        }
+
+    async def _use_llm_to_format_description(self, description_raw: str) -> Optional[dict[str, Any]]:
+        provider = settings.llm_provider
+        api_key = settings.openai_api_key if provider == "openai" else (settings.deepseek_api_key if provider == "deepseek" else "")
+        if not api_key or provider == "regex":
+            return None
+
+        base_url = "https://api.deepseek.com" if provider == "deepseek" else None
+        try:
+            from openai import AsyncOpenAI
+            client = AsyncOpenAI(api_key=api_key, base_url=base_url)
+            model = "gpt-4o-mini" if provider == "openai" else "deepseek-chat"
+            
+            prompt = (
+                "Dado o HTML de descrição de um imóvel, extraia os itens da descrição e organize-os em uma lista de tópicos limpa (um por linha, sem marcadores HTML ou markdown). Além disso, extraia a quantidade de quartos (bedrooms), banheiros (bathrooms) e vagas de garagem (parking spaces).\n\n"
+                f"HTML de descrição:\n{description_raw}\n\n"
+                "Retorne estritamente um JSON no seguinte formato:\n"
+                "{\n"
+                '  "descriptionFormatted": "Garagem p/ 04 carros\\n02 Salas de estar\\n...",\n'
+                '  "bedrooms": 3,\n'
+                '  "bathrooms": 2,\n'
+                '  "parkingSpaces": 1\n'
+                "}"
+            )
+            
+            response = await client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "user", "content": prompt}
+                ],
+                response_format={"type": "json_object"},
+                temperature=0.0,
+                timeout=10.0
+            )
+            content = response.choices[0].message.content
+            if content:
+                import json
+                data = json.loads(content)
+                return {
+                    "description": data.get("descriptionFormatted", ""),
+                    "bedrooms": data.get("bedrooms"),
+                    "bathrooms": data.get("bathrooms"),
+                    "parking_spaces": data.get("parkingSpaces")
+                }
+        except Exception as e:
+            logger.error("Error formatting description with LLM", error=str(e))
+        return None
+
+    async def _parse_detail_html(self, property_id: str, html: str, basic: Optional[dict[str, Any]] = None) -> Optional[PropertyListing]:
+        soup = BeautifulSoup(html, "html.parser")
         ref = ""
         address = ""
         number = ""
@@ -380,9 +587,7 @@ class ExataPropertyRepository(IPropertyRepository):
         complement = ""
         fees_str = ""
         price_str = ""
-        features: list[str] = []
-
-        # Extração das tabelas de detalhes
+        
         for strong in soup.find_all("strong"):
             label = strong.get_text(strip=True).lower()
             if not strong.parent:
@@ -408,13 +613,45 @@ class ExataPropertyRepository(IPropertyRepository):
                 price_str = val
 
         # Descrição/Características
-        for ul in soup.find_all("ul"):
-            lis = ul.find_all("li")
-            if lis:
-                features = [li.get_text(strip=True) for li in lis]
-                break
+        desc_td = None
+        for strong in soup.find_all("strong"):
+            lbl = strong.get_text(strip=True).lower()
+            if "descrição" in lbl or "descricao" in lbl:
+                # O texto da descrição geralmente está no td abaixo ou na mesma linha
+                parent_tr = strong.find_parent("tr")
+                if parent_tr:
+                    next_tr = parent_tr.find_next_sibling("tr")
+                    if next_tr:
+                        desc_td = next_tr.find("td")
+                        break
+        
+        description_raw = desc_td.decode_contents() if desc_td else ""
+        if not description_raw:
+            # Fallback a procurar ul
+            ul_tag = soup.find("ul")
+            if ul_tag:
+                description_raw = ul_tag.decode_contents()
 
-        # Fotos (fancybox links)
+        description_formatted = ""
+        bedrooms = None
+        bathrooms = None
+        parking_spaces = None
+
+        ai_result = await self._use_llm_to_format_description(description_raw)
+        if ai_result:
+            description_formatted = ai_result["description"]
+            bedrooms = ai_result["bedrooms"]
+            bathrooms = ai_result["bathrooms"]
+            parking_spaces = ai_result["parking_spaces"]
+        else:
+            lines = self._extract_description_lines(description_raw)
+            description_formatted = "\n".join(lines)
+            feats = self._parse_features_from_text(description_formatted)
+            bedrooms = feats["bedrooms"]
+            bathrooms = feats["bathrooms"]
+            parking_spaces = feats["parking_spaces"]
+
+        # Photos
         photos: list[str] = []
         for a in soup.find_all("a", class_="fancybox"):
             href_val = a.get("href")
@@ -425,7 +662,7 @@ class ExataPropertyRepository(IPropertyRepository):
                 if href not in photos:
                     photos.append(href)
 
-        # Fallbacks caso o HTML detalhado falte ou seja parseado incorretamente
+        # Fallbacks basic info
         if basic:
             if not ref:
                 ref = basic["ref"]
@@ -437,12 +674,28 @@ class ExataPropertyRepository(IPropertyRepository):
                 price_val = basic["price"]
             else:
                 price_val = self._parse_price(price_str)
-            if not photos and basic["cover_image"]:
+            if not photos and basic.get("cover_image"):
                 photos.append(basic["cover_image"])
+            intent_val = basic.get("intent", "Locação")
+            prop_type = basic.get("property_type", "Imóvel")
         else:
             price_val = self._parse_price(price_str)
+            intent_val = "Locação"
+            prop_type = "Imóvel"
+            # Tentar adivinhar tipo a partir do complemento ou descrição
+            comp_lower = complement.lower()
+            desc_lower = description_formatted.lower()
+            if "casa" in comp_lower or "casa" in desc_lower:
+                prop_type = "Casa"
+            elif "apto" in comp_lower or "apartamento" in comp_lower or "apartamento" in desc_lower:
+                prop_type = "Apartamento"
+            elif "sala" in comp_lower or "ponto" in comp_lower or "comercial" in desc_lower:
+                prop_type = "Ponto comercial"
+            elif "galpão" in comp_lower or "galpao" in desc_lower:
+                prop_type = "Galpão"
+            elif "quitinete" in comp_lower or "kitnet" in comp_lower or "quitinete" in desc_lower:
+                prop_type = "Quitinete"
 
-        # Monta endereço completo
         full_address = address
         if number:
             full_address += f", {number}"
@@ -451,20 +704,92 @@ class ExataPropertyRepository(IPropertyRepository):
 
         fees_val = self._parse_price(fees_str)
 
-        listing = PropertyListing(
+        return PropertyListing(
             property_id=property_id,
             ref=ref,
-            property_type=basic["property_type"]
-            if basic and "property_type" in basic
-            else "Imóvel",
+            property_type=prop_type,
             address=full_address,
             neighborhood=neighborhood,
             value=Money(price_val),
-            url=url,
+            url=f"{self.site_base_url}/detalhe_imovel.php?codigo={property_id}",
             fees=Money(fees_val) if fees_val > 0 else None,
-            features=features,
+            features=description_formatted.split("\n") if description_formatted else [],
             photos=photos,
+            bedrooms=bedrooms,
+            bathrooms=bathrooms,
+            parking_spaces=parking_spaces,
+            description=description_formatted,
+            intent=intent_val
         )
 
-        await self.cache.set(cache_key, listing)
-        return listing
+    # --- Live Scraper Search by Ref code ---
+
+    async def check_id_for_ref(self, id_val: int, target_ref: str) -> Optional[str]:
+        url = f"{self.site_base_url}/detalhe_imovel.php?codigo={id_val}"
+        try:
+            await self.rate_limiter.wait()
+            async with httpx.AsyncClient(headers=self.headers, timeout=5.0) as client:
+                response = await client.get(url)
+                if response.status_code == 200:
+                    html = response.text
+                    if target_ref.upper() in html.upper():
+                        ref_match = re.search(r'C&oacute;digo:<\/strong>\s*(?:<[^>]*>)*\s*([a-zA-Z0-9]+)', html, re.IGNORECASE) or \
+                                    re.search(r'C&oacute;digo:<\/strong>\s*([a-zA-Z0-9]+)', html, re.IGNORECASE) or \
+                                    re.search(r'C&oacute;digo:\s*([a-zA-Z0-9]+)', html, re.IGNORECASE)
+                        if ref_match and ref_match.group(1).upper() == target_ref.upper():
+                            return html
+        except Exception:
+            pass
+        return None
+
+    async def locate_property_html(self, target_ref: str) -> Optional[tuple[str, str]]:
+        # 1. Search in basic listings
+        all_basics = await self._scrape_all_basic_listings()
+        for pid, basic in all_basics.items():
+            if basic.get("ref", "").upper() == target_ref.upper():
+                url = f"{self.site_base_url}/detalhe_imovel.php?codigo={pid}"
+                await self.rate_limiter.wait()
+                async with httpx.AsyncClient(headers=self.headers, timeout=10.0) as client:
+                    resp = await client.get(url)
+                    if resp.status_code == 200:
+                        return pid, resp.text
+
+        # 2. Concurrently scan range of IDs
+        logger.info("Reference not found in active basic list. Scanning IDs concurrently...", ref=target_ref)
+        min_id = 500
+        max_id = 950
+        chunk_size = 30
+        
+        for start in range(max_id, min_id - 1, -chunk_size):
+            end = max(min_id, start - chunk_size + 1)
+            tasks = [self.check_id_for_ref(id_val, target_ref) for id_val in range(start, end - 1, -1)]
+            results = await asyncio.gather(*tasks)
+            for i, html in enumerate(results):
+                if html:
+                    scraped_id = str(start - i)
+                    return scraped_id, html
+        return None
+
+    async def scrape_by_ref(self, target_ref: str) -> Optional[PropertyListing]:
+        """Realiza o scrape completo de um imóvel por código de referência."""
+        result = await self.locate_property_html(target_ref)
+        if not result:
+            return None
+        property_id, html = result
+        
+        # Encontra se existia dados básicos
+        all_basics = await self._scrape_all_basic_listings()
+        basic = all_basics.get(property_id)
+        
+        listing = await self._parse_detail_html(property_id, html, basic)
+        if listing:
+            # Força a referência a ser exatamente o target_ref se veio diferente
+            if not listing.ref:
+                listing.ref = target_ref
+            await self.save(listing)
+            # Limpa cache
+            cache_key = f"property_detail_{property_id}"
+            await self.cache.delete(cache_key)
+            return listing
+        return None
+

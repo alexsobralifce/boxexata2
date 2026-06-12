@@ -7,6 +7,7 @@ from src.application.services.auth_service import verify_password, create_access
 from src.domain.entities.broker_profile import BrokerProfile
 from src.presentation.security import get_current_admin
 from src.shared.config import settings
+from src.shared.logger import logger
 
 # Importação lazy do container para obter os repositórios injetados
 from src.shared.container import get_container
@@ -180,3 +181,160 @@ async def delete_broker(
 
     await broker_repo.delete(instance_id)
     return {"status": "success", "message": f"Corretor com instância {instance_id} excluído."}
+
+
+class PropertySave(BaseModel):
+    id: str = Field(..., description="ID/Código do imóvel")
+    ref: str = Field(..., description="Referência do imóvel (ex: C763)")
+    property_type: str = Field(..., description="Tipo do imóvel (ex: Casa)")
+    address: str = Field(..., description="Endereço do imóvel")
+    neighborhood: str = Field(..., description="Bairro do imóvel")
+    value: float = Field(..., description="Valor")
+    url: str = Field(..., description="URL")
+    fees: Optional[float] = Field(default=0.0, description="Taxas / IPTU")
+    bedrooms: Optional[int] = Field(default=None)
+    bathrooms: Optional[int] = Field(default=None)
+    parking_spaces: Optional[int] = Field(default=None)
+    description: Optional[str] = Field(default=None)
+    photos: list[str] = Field(default_factory=list)
+    intent: Optional[str] = Field(default="Locação")
+
+
+class ScrapeRequest(BaseModel):
+    ref: str = Field(..., description="Código de referência do imóvel (ex: C763)")
+
+
+@router.get("/properties", response_model=list[dict[str, Any]])
+async def list_properties(
+    property_type: Optional[str] = None,
+    bedrooms: Optional[int] = None,
+    bathrooms: Optional[int] = None,
+    parking_spaces: Optional[int] = None,
+    min_price: Optional[float] = None,
+    max_price: Optional[float] = None,
+    neighborhood: Optional[str] = None,
+    intent: Optional[str] = None,
+    ref: Optional[str] = None,
+    _: str = Depends(get_current_admin),
+) -> list[dict[str, Any]]:
+    """Lista os imóveis armazenados no banco de dados com suporte a filtros avançados."""
+    container = get_container()
+    property_repo = container["property_repo"]
+
+    # Se a tabela properties estiver totalmente vazia, realiza uma carga inicial de listagem básica
+    # para povoar o banco e facilitar a vida do administrador
+    from src.infrastructure.persistence.models import Properties
+    from sqlalchemy.ext.asyncio import AsyncSession
+    from sqlmodel import select
+
+    if property_repo.engine:
+        async with AsyncSession(property_repo.engine) as session:
+            statement = select(Properties).limit(1)
+            result = await session.execute(statement)
+            if not result.scalars().first():
+                # Dispara a busca geral para criar os registros iniciais no banco
+                logger.info("Carga inicial de imóveis executada (banco de dados vazio)")
+                await property_repo._scrape_all_basic_listings()
+                # Salva as básicas no banco
+                all_basics = await property_repo._scrape_all_basic_listings()
+                from src.domain.entities.property_listing import PropertyListing
+                from src.domain.value_objects.money import Money
+                for pid, basic in all_basics.items():
+                    listing = PropertyListing(
+                        property_id=pid,
+                        ref=basic["ref"],
+                        property_type="Imóvel",
+                        address=basic["address"],
+                        neighborhood=basic["neighborhood"],
+                        value=Money(basic["price"]),
+                        url=basic["url"],
+                        photos=[basic["cover_image"]] if basic["cover_image"] else [],
+                        intent=basic["intent"]
+                    )
+                    await property_repo.save(listing)
+
+    properties = await property_repo.list_stored_properties(
+        property_type=property_type,
+        bedrooms=bedrooms,
+        bathrooms=bathrooms,
+        parking_spaces=parking_spaces,
+        min_price=min_price,
+        max_price=max_price,
+        neighborhood=neighborhood,
+        intent=intent,
+        ref=ref,
+    )
+    return [p.to_dict() for p in properties]
+
+
+@router.post("/properties/scrape", response_model=dict[str, Any])
+async def scrape_property_by_ref(
+    req: ScrapeRequest,
+    _: str = Depends(get_current_admin),
+) -> dict[str, Any]:
+    """Executa o web scraper dinâmico para importar/atualizar um imóvel por referência."""
+    container = get_container()
+    property_repo = container["property_repo"]
+
+    try:
+        scraped = await property_repo.scrape_by_ref(req.ref)
+        if not scraped:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Imóvel com referência {req.ref} não encontrado no site Exata.",
+            )
+        return {"status": "success", "property": scraped.to_dict()}
+    except Exception as e:
+        logger.error("Falha ao raspar imóvel via admin API", ref=req.ref, error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao executar scraper: {e}",
+        )
+
+
+@router.put("/properties/{property_id}", response_model=dict[str, Any])
+async def save_or_update_property(
+    property_id: str,
+    data: PropertySave,
+    _: str = Depends(get_current_admin),
+) -> dict[str, Any]:
+    """Salva ou edita manualmente as informações estruturadas de um imóvel no banco."""
+    container = get_container()
+    property_repo = container["property_repo"]
+
+    from src.domain.entities.property_listing import PropertyListing
+    from src.domain.value_objects.money import Money
+
+    listing = PropertyListing(
+        property_id=property_id,
+        ref=data.ref,
+        property_type=data.property_type,
+        address=data.address,
+        neighborhood=data.neighborhood,
+        value=Money(data.value),
+        url=data.url,
+        fees=Money(data.fees) if data.fees and data.fees > 0 else None,
+        features=data.description.split("\n") if data.description else [],
+        photos=data.photos,
+        bedrooms=data.bedrooms,
+        bathrooms=data.bathrooms,
+        parking_spaces=data.parking_spaces,
+        description=data.description,
+        intent=data.intent
+    )
+
+    await property_repo.save(listing)
+    return {"status": "success", "property": listing.to_dict()}
+
+
+@router.delete("/properties/{property_id}", response_model=dict[str, str])
+async def delete_property(
+    property_id: str,
+    _: str = Depends(get_current_admin),
+) -> dict[str, str]:
+    """Exclui o registro de um imóvel do banco de dados."""
+    container = get_container()
+    property_repo = container["property_repo"]
+
+    await property_repo.delete(property_id)
+    return {"status": "success", "message": f"Imóvel {property_id} removido."}

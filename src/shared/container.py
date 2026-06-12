@@ -47,11 +47,18 @@ def create_container(settings: Settings) -> dict[str, Any]:
     else:
         cache = MemoryCache(default_ttl_seconds=settings.cache_ttl_minutes * 60)
 
+    # Inicializa engine do banco de dados (se houver URL configurada)
+    db_engine: Optional[AsyncEngine] = None
+    if settings.database_url:
+        from sqlalchemy.ext.asyncio import create_async_engine
+        db_engine = create_async_engine(settings.database_url)
+
     rate_limiter = RateLimiter(min_delay_seconds=1.0)
 
     property_repo = ExataPropertyRepository(
         cache=cache,
         rate_limiter=rate_limiter,
+        engine=db_engine,
     )
 
     # Seleciona o gateway de WhatsApp conforme a variável WHATSAPP_PROVIDER
@@ -90,13 +97,9 @@ def create_container(settings: Settings) -> dict[str, Any]:
         extractor = RegexPreferenceExtractor()
 
     # Inicializa persistência de logs (Fase 8A)
-    db_engine: Optional[AsyncEngine] = None
     log_repo: IMessageLogRepository
 
-    if settings.message_log_enabled and settings.database_url:
-        from sqlalchemy.ext.asyncio import create_async_engine
-
-        db_engine = create_async_engine(settings.database_url)
+    if settings.message_log_enabled and db_engine:
         log_repo = SqlMessageLogRepository(db_engine)
         # Decorador do gateway para registrar logs de saída automaticamente
         message_gateway = MessageLogMiddleware(

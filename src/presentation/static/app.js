@@ -132,6 +132,10 @@ function loadTabContent(tab) {
         tabTitle.textContent = 'Alertas Ativos';
         tabSubtitle.textContent = 'Gerencie as assinaturas de alertas de novos imóveis criadas pelos usuários';
         loadSubscriptions();
+    } else if (tab === 'properties') {
+        tabTitle.textContent = 'Imóveis Cadastrados';
+        tabSubtitle.textContent = 'Importe imóveis do site Exata Serviços ou cadastre-os manualmente e filtre-os';
+        loadProperties();
     }
 }
 
@@ -371,6 +375,17 @@ function setupForms() {
             alert(`Erro: ${err.message}`);
         }
     });
+
+    // --- Eventos do Dashboard de Imóveis ---
+    document.getElementById('btn-refresh-properties').addEventListener('click', loadProperties);
+    document.getElementById('btn-clear-prop-filters').addEventListener('click', clearPropertyFilters);
+    document.getElementById('btn-apply-prop-filters').addEventListener('click', loadProperties);
+    document.getElementById('property-scraper-form').addEventListener('submit', runPropertyScraper);
+    document.getElementById('btn-new-property').addEventListener('click', openPropertyAddModal);
+    
+    document.getElementById('btn-close-property-modal').addEventListener('click', closePropertyModal);
+    document.getElementById('btn-close-property-form').addEventListener('click', closePropertyModal);
+    document.getElementById('property-modal-form').addEventListener('submit', savePropertyForm);
 }
 
 // ==========================================
@@ -388,3 +403,326 @@ function escapeHtml(str) {
 function rawJsonAttr(obj) {
     return escapeHtml(JSON.stringify(obj));
 }
+
+// --- ABA 4: IMÓVEIS (LÓGICA) ---
+async function loadProperties() {
+    const tableBody = document.getElementById('properties-table-body');
+    tableBody.innerHTML = `<tr><td colspan="6" class="text-center">Buscando imóveis...</td></tr>`;
+
+    const intent = document.getElementById('prop-filter-intent').value;
+    const type = document.getElementById('prop-filter-type').value;
+    const bedrooms = document.getElementById('prop-filter-bedrooms').value;
+    const bathrooms = document.getElementById('prop-filter-bathrooms').value;
+    const parking = document.getElementById('prop-filter-parking').value;
+    const neighborhood = document.getElementById('prop-filter-neighborhood').value.trim();
+    const minPrice = document.getElementById('prop-filter-min-price').value;
+    const maxPrice = document.getElementById('prop-filter-max-price').value;
+
+    let url = `${API_BASE}/properties?`;
+    if (intent) url += `&intent=${encodeURIComponent(intent)}`;
+    if (type) url += `&property_type=${encodeURIComponent(type)}`;
+    if (bedrooms) url += `&bedrooms=${bedrooms}`;
+    if (bathrooms) url += `&bathrooms=${bathrooms}`;
+    if (parking) url += `&parking_spaces=${parking}`;
+    if (neighborhood) url += `&neighborhood=${encodeURIComponent(neighborhood)}`;
+    if (minPrice) url += `&min_price=${minPrice}`;
+    if (maxPrice) url += `&max_price=${maxPrice}`;
+
+    try {
+        const response = await fetchAuth(url);
+        if (!response.ok) throw new Error('Falha ao obter imóveis');
+        const properties = await response.json();
+
+        if (properties.length === 0) {
+            tableBody.innerHTML = `<tr><td colspan="6" class="text-center text-muted">Nenhum imóvel cadastrado no banco de dados. Use o scraper acima para importar!</td></tr>`;
+            return;
+        }
+
+        tableBody.innerHTML = properties.map(p => {
+            const priceFmt = p.value ? 'R$ ' + p.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : 'R$ 0,00';
+            const feesFmt = p.fees ? 'R$ ' + p.fees.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '-';
+            const intentBadge = p.intent && p.intent.toLowerCase().includes('venda') 
+                ? '<span class="badge badge-out">Venda</span>' 
+                : '<span class="badge badge-in">Aluguel</span>';
+            
+            const bedroomsHtml = p.bedrooms !== null && p.bedrooms !== undefined ? `<span class="prop-badge">🛏️ ${p.bedrooms}</span>` : '';
+            const bathroomsHtml = p.bathrooms !== null && p.bathrooms !== undefined ? `<span class="prop-badge">🚿 ${p.bathrooms}</span>` : '';
+            const parkingHtml = p.parking_spaces !== null && p.parking_spaces !== undefined ? `<span class="prop-badge">🚗 ${p.parking_spaces}</span>` : '';
+            
+            const descTrunc = p.description ? (p.description.length > 80 ? p.description.substring(0, 80) + '...' : p.description) : '-';
+
+            const photoUrl = p.photos && p.photos.length > 0 ? p.photos[0] : '';
+            const imgHtml = photoUrl ? `<img class="prop-image-thumb" src="${escapeHtml(photoUrl)}" alt="Foto">` : '<div class="prop-image-thumb text-center" style="display:flex;align-items:center;justify-content:center;font-size:1.5rem;">🏡</div>';
+
+            return `
+                <tr>
+                    <td>
+                        <div style="display:flex;align-items:center;gap:12px;">
+                            ${imgHtml}
+                            <div>
+                                <span class="text-bold">${escapeHtml(p.ref || 'S/Ref')}</span><br>
+                                <span class="text-muted" style="font-size:0.75rem;">ID: ${escapeHtml(p.id)}</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="text-bold">${escapeHtml(p.property_type)}</span><br>
+                        ${intentBadge}
+                    </td>
+                    <td>
+                        <span>${escapeHtml(p.address)}</span><br>
+                        <span class="text-muted" style="font-size:0.8rem;">📍 Bairro: ${escapeHtml(p.neighborhood)}</span>
+                    </td>
+                    <td>
+                        <span class="text-bold" style="color:var(--primary-color);">${priceFmt}</span><br>
+                        <span class="text-muted" style="font-size:0.8rem;">Taxas: ${feesFmt}</span>
+                    </td>
+                    <td>
+                        <div class="prop-details-badges">
+                            ${bedroomsHtml}
+                            ${bathroomsHtml}
+                            ${parkingHtml}
+                        </div>
+                        <div class="text-muted" style="font-size:0.75rem;margin-top:6px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                            ${escapeHtml(descTrunc.replace(/\n/g, ' '))}
+                        </div>
+                    </td>
+                    <td>
+                        <div class="prop-actions">
+                            <button class="btn-action-icon copy" title="Copiar Detalhes (WhatsApp)" onclick='copyPropertyDetails(${rawJsonAttr(p)})'>📋</button>
+                            <button class="btn-action-icon edit" title="Editar Imóvel" onclick='openPropertyEditModal(${rawJsonAttr(p)})'>✏️</button>
+                            <button class="btn-action-icon delete" title="Excluir Imóvel" onclick="deleteProperty('${p.id}')">🗑️</button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    } catch (err) {
+        tableBody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">Erro: ${err.message}</td></tr>`;
+    }
+}
+
+// Limpa filtros
+function clearPropertyFilters() {
+    document.getElementById('prop-filter-intent').value = '';
+    document.getElementById('prop-filter-type').value = '';
+    document.getElementById('prop-filter-bedrooms').value = '';
+    document.getElementById('prop-filter-bathrooms').value = '';
+    document.getElementById('prop-filter-parking').value = '';
+    document.getElementById('prop-filter-neighborhood').value = '';
+    document.getElementById('prop-filter-min-price').value = '';
+    document.getElementById('prop-filter-max-price').value = '';
+    loadProperties();
+}
+
+// Executa scraper
+async function runPropertyScraper(e) {
+    e.preventDefault();
+    const refInput = document.getElementById('scraper-ref');
+    const ref = refInput.value.trim();
+    const statusBox = document.getElementById('scraper-status');
+
+    if (!ref) return;
+
+    statusBox.className = 'scraper-status-box loading';
+    statusBox.innerHTML = `<span>⏳ Procurando e raspando referência ${ref}...</span>`;
+
+    try {
+        const response = await fetchAuth(`${API_BASE}/properties/scrape`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ ref: ref })
+        });
+
+        if (!response.ok) {
+            const data = await response.json();
+            throw new Error(data.detail || 'Imóvel não encontrado ou falha no scraping');
+        }
+
+        const data = await response.json();
+        statusBox.className = 'scraper-status-box success';
+        statusBox.innerHTML = `<span>✅ Imóvel ${ref} importado com sucesso no banco!</span>`;
+        refInput.value = '';
+
+        loadProperties();
+        
+        if (data.property) {
+            setTimeout(() => {
+                openPropertyEditModal(data.property);
+            }, 800);
+        }
+    } catch (err) {
+        statusBox.className = 'scraper-status-box error';
+        statusBox.innerHTML = `<span>❌ Erro: ${err.message}</span>`;
+    }
+}
+
+const propertyModal = document.getElementById('property-modal');
+
+window.openPropertyEditModal = function(p) {
+    document.getElementById('property-modal-title').textContent = 'Editar Detalhes do Imóvel';
+    document.getElementById('property-modal-id').value = p.id;
+    
+    document.getElementById('property-modal-ref').value = p.ref || '';
+    document.getElementById('property-modal-ref').disabled = false;
+    document.getElementById('property-modal-type').value = p.property_type || 'Casa';
+    document.getElementById('property-modal-intent').value = p.intent || 'Locação';
+    document.getElementById('property-modal-value').value = p.value || 0;
+    document.getElementById('property-modal-fees').value = p.fees || 0;
+    document.getElementById('property-modal-url').value = p.url || '';
+    document.getElementById('property-modal-address').value = p.address || '';
+    document.getElementById('property-modal-neighborhood').value = p.neighborhood || '';
+    
+    document.getElementById('property-modal-bedrooms').value = p.bedrooms !== null && p.bedrooms !== undefined ? p.bedrooms : '';
+    document.getElementById('property-modal-bathrooms').value = p.bathrooms !== null && p.bathrooms !== undefined ? p.bathrooms : '';
+    document.getElementById('property-modal-parking').value = p.parking_spaces !== null && p.parking_spaces !== undefined ? p.parking_spaces : '';
+    document.getElementById('property-modal-description').value = p.description || '';
+    document.getElementById('property-modal-photos').value = p.photos ? p.photos.join('\n') : '';
+
+    propertyModal.classList.add('active');
+};
+
+window.openPropertyAddModal = function() {
+    document.getElementById('property-modal-title').textContent = 'Cadastrar Novo Imóvel';
+    document.getElementById('property-modal-id').value = 'new_' + Math.random().toString(36).substr(2, 9);
+    
+    document.getElementById('property-modal-ref').value = '';
+    document.getElementById('property-modal-ref').disabled = false;
+    document.getElementById('property-modal-type').value = 'Casa';
+    document.getElementById('property-modal-intent').value = 'Locação';
+    document.getElementById('property-modal-value').value = '';
+    document.getElementById('property-modal-fees').value = '';
+    document.getElementById('property-modal-url').value = '';
+    document.getElementById('property-modal-address').value = '';
+    document.getElementById('property-modal-neighborhood').value = '';
+    
+    document.getElementById('property-modal-bedrooms').value = '';
+    document.getElementById('property-modal-bathrooms').value = '';
+    document.getElementById('property-modal-parking').value = '';
+    document.getElementById('property-modal-description').value = '';
+    document.getElementById('property-modal-photos').value = '';
+
+    propertyModal.classList.add('active');
+};
+
+function closePropertyModal() {
+    propertyModal.classList.remove('active');
+}
+
+async function savePropertyForm(e) {
+    e.preventDefault();
+
+    const id = document.getElementById('property-modal-id').value;
+    const ref = document.getElementById('property-modal-ref').value.trim();
+    const type = document.getElementById('property-modal-type').value;
+    const intent = document.getElementById('property-modal-intent').value;
+    const value = parseFloat(document.getElementById('property-modal-value').value) || 0;
+    const fees = parseFloat(document.getElementById('property-modal-fees').value) || 0;
+    const url = document.getElementById('property-modal-url').value.trim();
+    const address = document.getElementById('property-modal-address').value.trim();
+    const neighborhood = document.getElementById('property-modal-neighborhood').value.trim();
+    
+    const bedrooms = document.getElementById('property-modal-bedrooms').value;
+    const bathrooms = document.getElementById('property-modal-bathrooms').value;
+    const parking = document.getElementById('property-modal-parking').value;
+    
+    const description = document.getElementById('property-modal-description').value;
+    const photosText = document.getElementById('property-modal-photos').value.trim();
+    const photos = photosText ? photosText.split('\n').map(p => p.trim()).filter(Boolean) : [];
+
+    const finalId = id.startsWith('new_') ? (ref ? ref : Math.random().toString(36).substr(2, 9)) : id;
+
+    const data = {
+        id: finalId,
+        ref: ref,
+        property_type: type,
+        intent: intent,
+        value: value,
+        fees: fees,
+        url: url,
+        address: address,
+        neighborhood: neighborhood,
+        bedrooms: bedrooms !== '' ? parseInt(bedrooms, 10) : null,
+        bathrooms: bathrooms !== '' ? parseInt(bathrooms, 10) : null,
+        parking_spaces: parking !== '' ? parseInt(parking, 10) : null,
+        description: description,
+        photos: photos
+    };
+
+    try {
+        const response = await fetchAuth(`${API_BASE}/properties/${encodeURIComponent(finalId)}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
+
+        if (!response.ok) throw new Error('Falha ao salvar imóvel no banco');
+
+        closePropertyModal();
+        loadProperties();
+        alert('Imóvel salvo com sucesso!');
+    } catch (err) {
+        alert(`Erro: ${err.message}`);
+    }
+}
+
+window.deleteProperty = async function(id) {
+    if (!confirm('Deseja realmente excluir este imóvel do banco de dados?')) return;
+
+    try {
+        const response = await fetchAuth(`${API_BASE}/properties/${encodeURIComponent(id)}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) throw new Error('Falha ao excluir imóvel');
+        loadProperties();
+    } catch (err) {
+        alert(`Erro: ${err.message}`);
+    }
+};
+
+window.copyPropertyDetails = function(p) {
+    const valueFmt = p.value ? p.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '0,00';
+    const feesFmt = p.fees ? p.fees.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '';
+
+    let street = p.address;
+    let number = '';
+    let complement = '';
+
+    const parts = p.address.split(',');
+    if (parts.length > 1) {
+        street = parts[0].trim();
+        const secondPart = parts[1].split('-');
+        number = secondPart[0].trim();
+        if (secondPart.length > 1) {
+            complement = secondPart[1].trim();
+        }
+    }
+
+    const template = `Detalhe imóvel
+ 
+Código: ${p.ref || 'S/Ref'}
+Endereço: ${street}
+Número: ${number}
+Bairro: ${p.neighborhood || ''}
+Complemento: ${complement || p.property_type || ''}
+Taxas R$: ${feesFmt}
+Valor R$: ${valueFmt}
+ 
+Descrição:
+${p.description || ''}`;
+
+    navigator.clipboard.writeText(template).then(() => {
+        const toast = document.getElementById('copy-toast');
+        toast.classList.add('show');
+        setTimeout(() => {
+            toast.classList.remove('show');
+        }, 2000);
+    }).catch(err => {
+        console.error('Falha ao copiar detalhes:', err);
+    });
+};

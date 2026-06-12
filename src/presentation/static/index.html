@@ -55,6 +55,9 @@
                 <button class="nav-link" data-tab="subscriptions">
                     <span class="nav-icon">🔔</span> Alertas Ativos
                 </button>
+                <button class="nav-link" data-tab="properties">
+                    <span class="nav-icon">🏡</span> Imóveis Cadastrados
+                </button>
             </nav>
             <div class="sidebar-footer">
                 <button id="logout-btn" class="btn btn-secondary btn-sm">Sair</button>
@@ -198,8 +201,223 @@
                     </div>
                 </div>
             </section>
+
+            <!-- Tab Content: Properties -->
+            <section id="tab-content-properties" class="tab-content">
+                <!-- Row for Scraper Card and Search Filters -->
+                <div class="properties-top-grid">
+                    <!-- Advanced Filters Card -->
+                    <div class="glass-card property-filters-card">
+                        <h3>Filtros de Busca</h3>
+                        <div class="property-filters-grid">
+                            <div class="filter-group">
+                                <label for="prop-filter-intent">Finalidade</label>
+                                <select id="prop-filter-intent">
+                                    <option value="">Todos</option>
+                                    <option value="Locação">Locação</option>
+                                    <option value="Venda">Venda</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label for="prop-filter-type">Tipo de Imóvel</label>
+                                <select id="prop-filter-type">
+                                    <option value="">Todos</option>
+                                    <option value="Casa">Casa</option>
+                                    <option value="Apartamento">Apartamento</option>
+                                    <option value="Quitinete">Quitinete</option>
+                                    <option value="Ponto comercial">Ponto Comercial</option>
+                                    <option value="Salas">Salas</option>
+                                    <option value="Galpão">Galpão</option>
+                                    <option value="Terreno">Terreno</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label for="prop-filter-bedrooms">Quartos (Mín)</label>
+                                <select id="prop-filter-bedrooms">
+                                    <option value="">Qualquer</option>
+                                    <option value="1">1 quarto</option>
+                                    <option value="2">2 quartos</option>
+                                    <option value="3">3 quartos</option>
+                                    <option value="4">4+ quartos</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label for="prop-filter-bathrooms">Banheiros (Mín)</label>
+                                <select id="prop-filter-bathrooms">
+                                    <option value="">Qualquer</option>
+                                    <option value="1">1 banheiro</option>
+                                    <option value="2">2 banheiros</option>
+                                    <option value="3">3+ banheiros</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label for="prop-filter-parking">Garagem (Mín)</label>
+                                <select id="prop-filter-parking">
+                                    <option value="">Qualquer</option>
+                                    <option value="0">Sem garagem</option>
+                                    <option value="1">1+ vagas</option>
+                                    <option value="2">2+ vagas</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label for="prop-filter-neighborhood">Bairro</label>
+                                <input type="text" id="prop-filter-neighborhood" placeholder="Ex: Centro, Derby">
+                            </div>
+                            <div class="filter-group">
+                                <label for="prop-filter-min-price">Valor Mínimo (R$)</label>
+                                <input type="number" id="prop-filter-min-price" placeholder="Mín">
+                            </div>
+                            <div class="filter-group">
+                                <label for="prop-filter-max-price">Valor Máximo (R$)</label>
+                                <input type="number" id="prop-filter-max-price" placeholder="Máx">
+                            </div>
+                        </div>
+                        <div class="filter-actions">
+                            <button id="btn-clear-prop-filters" class="btn btn-secondary">Limpar Filtros</button>
+                            <button id="btn-apply-prop-filters" class="btn btn-primary">Aplicar Filtros</button>
+                        </div>
+                    </div>
+
+                    <!-- Scraper/Import Card -->
+                    <div class="glass-card property-scraper-card">
+                        <h3>Importar do Site (Scraper)</h3>
+                        <p class="text-muted">Importe e reformatar imóveis do site Exata Serviços usando a referência do imóvel.</p>
+                        <form id="property-scraper-form" class="scraper-form">
+                            <div class="form-group">
+                                <label for="scraper-ref">Referência do Imóvel</label>
+                                <div class="input-action-group">
+                                    <input type="text" id="scraper-ref" required placeholder="Ex: C763, R273">
+                                    <button type="submit" id="btn-run-scraper" class="btn btn-primary">Importar</button>
+                                </div>
+                            </div>
+                            <div id="scraper-status" class="scraper-status-box"></div>
+                        </form>
+                        <div class="manual-creation-info">
+                            <button id="btn-new-property" class="btn btn-secondary btn-full">Cadastrar Imóvel Manualmente</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Table Card -->
+                <div class="glass-card table-card">
+                    <div class="card-header-actions">
+                        <h3>Imóveis Cadastrados</h3>
+                        <button id="btn-refresh-properties" class="btn btn-secondary btn-sm">Atualizar Lista</button>
+                    </div>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Ref / ID</th>
+                                    <th>Tipo</th>
+                                    <th>Endereço / Bairro</th>
+                                    <th>Valor / Taxas</th>
+                                    <th>Físico / Características</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="properties-table-body">
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted">Carregando imóveis...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
         </main>
     </div>
+
+    <!-- Property Modal -->
+    <div id="property-modal" class="modal-backdrop">
+        <div class="modal-container glass-card">
+            <div class="modal-header">
+                <h3 id="property-modal-title">Editar Imóvel</h3>
+                <button type="button" id="btn-close-property-modal" class="modal-close-btn">&times;</button>
+            </div>
+            <form id="property-modal-form" class="crud-form">
+                <input type="hidden" id="property-modal-id">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="property-modal-ref">Referência / Código</label>
+                        <input type="text" id="property-modal-ref" required placeholder="Ex: C763">
+                    </div>
+                    <div class="form-group">
+                        <label for="property-modal-type">Tipo de Imóvel</label>
+                        <select id="property-modal-type" required>
+                            <option value="Casa">Casa</option>
+                            <option value="Apartamento">Apartamento</option>
+                            <option value="Quitinete">Quitinete</option>
+                            <option value="Ponto comercial">Ponto Comercial</option>
+                            <option value="Salas">Salas</option>
+                            <option value="Galpão">Galpão</option>
+                            <option value="Terreno">Terreno</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="property-modal-intent">Finalidade</label>
+                        <select id="property-modal-intent" required>
+                            <option value="Locação">Locação</option>
+                            <option value="Venda">Venda</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="property-modal-value">Valor (R$)</label>
+                        <input type="number" step="0.01" id="property-modal-value" required placeholder="Ex: 1500.00">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="property-modal-fees">Taxas / IPTU (R$)</label>
+                        <input type="number" step="0.01" id="property-modal-fees" placeholder="Ex: 80.00">
+                    </div>
+                    <div class="form-group">
+                        <label for="property-modal-url">URL Site</label>
+                        <input type="url" id="property-modal-url" placeholder="Ex: https://...">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="property-modal-address">Endereço Completo</label>
+                    <input type="text" id="property-modal-address" required placeholder="Rua Doutor Monte, 1535">
+                </div>
+                <div class="form-group">
+                    <label for="property-modal-neighborhood">Bairro</label>
+                    <input type="text" id="property-modal-neighborhood" required placeholder="Campo dos Velhos">
+                </div>
+                <div class="form-row-three">
+                    <div class="form-group">
+                        <label for="property-modal-bedrooms">Quartos</label>
+                        <input type="number" id="property-modal-bedrooms" min="0" placeholder="Ex: 3">
+                    </div>
+                    <div class="form-group">
+                        <label for="property-modal-bathrooms">Banheiros</label>
+                        <input type="number" id="property-modal-bathrooms" min="0" placeholder="Ex: 2">
+                    </div>
+                    <div class="form-group">
+                        <label for="property-modal-parking">Garagem</label>
+                        <input type="number" id="property-modal-parking" min="0" placeholder="Ex: 1">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="property-modal-description">Descrição Estruturada</label>
+                    <textarea id="property-modal-description" rows="6" placeholder="Garagem p/ 02 carros&#10;03 Quartos (1 suíte)&#10;02 Banheiros..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="property-modal-photos">URLs das Fotos (uma por linha)</label>
+                    <textarea id="property-modal-photos" rows="3" placeholder="https://exataservicos.net/fotos/C763_1.jpg&#10;https://exataservicos.net/fotos/C763_2.jpg"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="button" id="btn-close-property-form" class="btn btn-secondary">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar Alterações</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Cópia Sucesso Notificação -->
+    <div id="copy-toast" class="toast-notification">Copiado com sucesso!</div>
 
     <!-- JS App -->
     <script src="/admin/app.js"></script>
