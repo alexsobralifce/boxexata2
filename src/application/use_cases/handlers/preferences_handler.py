@@ -26,7 +26,10 @@ class PreferencesHandler(BaseHandler):
         if not session.property_type:
             await self.message_gateway.send_text(
                 session.phone,
-                "Qual tipo de imóvel você procura? 🏡 (Ex: casa, apartamento, quitinete, etc.)",
+                "Qual tipo de imóvel você procura? 🏡 (Ex: casa, apartamento, quitinete, etc.)\n\n"
+                "💡 *Dica:* Fique à vontade para descrever em detalhes o que você busca! Por exemplo: "
+                '*“casa com 3 quartos, garagem e 2 banheiros”* ou *“apartamento mobiliado perto do shopping”*. '
+                "Nosso sistema vai ler e filtrar as melhores opções para você. 😉",
             )
             return False
 
